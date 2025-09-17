@@ -1,0 +1,50 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:../../../data/trader.db"
+}
+
+model Portfolio {
+  id            Int        @id @default(autoincrement())
+  name          String     @default("Default")
+  baseCurrency  String     @default("USD")
+  cashBalance   Decimal    @default(100000)
+  positions     Position[]
+  trades        Trade[]
+}
+
+model Position {
+  id          Int       @id @default(autoincrement())
+  portfolioId Int
+  symbol      String
+  qty         Decimal
+  avgPrice    Decimal
+  portfolio   Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+}
+
+model Trade {
+  id          Int       @id @default(autoincrement())
+  portfolioId Int
+  symbol      String
+  side        String
+  qty         Decimal
+  price       Decimal
+  ts          DateTime  @default(now())
+  portfolio   Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+}
+
+model SymbolResolution {
+  id           Int      @id @default(autoincrement())
+  query        String
+  resultSymbol String
+  mic          String?
+  createdAt    DateTime @default(now())
+
+  @@index([query])
+}
+
+
+

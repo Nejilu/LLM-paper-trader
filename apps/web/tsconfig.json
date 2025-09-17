@@ -1,0 +1,58 @@
+{
+    "extends":  "../../tsconfig.base.json",
+    "compilerOptions":  {
+                            "target":  "ES2021",
+                            "module":  "ESNext",
+                            "jsx":  "preserve",
+                            "allowJs":  true,
+                            "noEmit":  true,
+                            "moduleResolution":  "Node",
+                            "incremental":  true,
+                            "baseUrl":  ".",
+                            "paths":  {
+                                          "@/*":  [
+                                                      "./src/*"
+                                                  ],
+                                          "@/app/*":  [
+                                                          "./app/*"
+                                                      ],
+                                          "@/components/*":  [
+                                                                 "./src/components/*"
+                                                             ],
+                                          "@/lib/*":  [
+                                                          "./src/lib/*"
+                                                      ],
+                                          "@/hooks/*":  [
+                                                            "./src/hooks/*"
+                                                        ],
+                                          "@/providers":  [
+                                                              "./src/providers"
+                                                          ]
+                                      },
+                            "lib":  [
+                                        "dom",
+                                        "dom.iterable",
+                                        "esnext"
+                                    ],
+                            "plugins":  [
+                                            {
+                                                "name":  "next"
+                                            }
+                                        ]
+                        },
+    "include":  [
+                    "next-env.d.ts",
+                    "next.config.js",
+                    "next.config.ts",
+                    "app/**/*.ts",
+                    "app/**/*.tsx",
+                    "src/**/*.ts",
+                    "src/**/*.tsx",
+                    "tailwind.config.ts",
+                    "postcss.config.cjs",
+                    ".next/types/**/*.ts"
+                ],
+    "exclude":  [
+                    "node_modules"
+                ]
+}

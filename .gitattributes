@@ -1,0 +1,37 @@
+# Handle line endings consistently across platforms
+* text=auto eol=lf
+
+# Scripts
+*.sh text eol=lf
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+
+# Type-aware diffs for the TypeScript/JavaScript stack
+*.ts diff=typescript
+*.tsx diff=typescript
+*.js diff=javascript
+*.jsx diff=javascript
+
+# Structured text formats
+*.json text
+*.jsonc text
+*.cjs text
+*.mjs text
+*.yml text
+*.yaml text
+*.md text
+*.css text
+*.scss text
+*.html text
+*.prisma text
+pnpm-lock.yaml text eol=lf
+
+# Binary assets
+*.db binary
+*.sqlite binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary

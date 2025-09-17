@@ -1,0 +1,14 @@
+node_modules/
+.pnpm-store/
+.next/
+dist/
+build/
+.env
+.env.local
+.env.development
+.env.production
+pnpm-debug.log
+coverage/
+*.log
+/data/trader.db
+/prisma/
