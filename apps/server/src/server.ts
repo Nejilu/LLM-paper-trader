@@ -1,4 +1,4 @@
-﻿import cors from "cors";
+import cors from "cors";
 import express from "express";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
@@ -18,10 +18,21 @@ import {
   TradeInput
 } from "./portfolio";
 import { AssetClass, PortfolioSnapshot, SearchResultItem } from "./types";
+import { registerLlmRoutes } from "./llmRoutes";
 
 const DEFAULT_PORTFOLIO_ID = 1;
 const INITIAL_CASH_BALANCE = new Prisma.Decimal(100000);
 const openFigiClient = new OpenFigiClient(process.env.OPENFIGI_API_KEY);
+
+type YahooSearchQuote = {
+  symbol?: string | null;
+  shortname?: string | null;
+  longname?: string | null;
+  exchange?: string | null;
+  exchangeDisplay?: string | null;
+  quoteType?: string | null;
+  [key: string]: unknown;
+};
 
 const searchQuerySchema = z.object({
   q: z.string().min(1),
@@ -89,7 +100,7 @@ export async function createServer() {
       const openFigiResults = await openFigiClient.search({ query: q, types, limit });
       const enriched = await enrichWithYahooSymbol(openFigiResults, q);
 
-      let results = enriched;
+      let results: SearchResultItem[] = enriched;
       if (results.length < limit) {
         const yahooFallback = await searchDirectlyOnYahoo(q, limit - results.length, types);
         results = dedupeResults([...results, ...yahooFallback]);
@@ -413,6 +424,7 @@ export async function createServer() {
     }
   });
 
+  registerLlmRoutes(app);
   return app;
 }
 
@@ -466,7 +478,7 @@ async function searchDirectlyOnYahoo(query: string, limit: number, types?: Asset
   }
   try {
     const searchResult = await yahooFinance.search(query, { quotesCount: Math.min(limit * 2, 20), newsCount: 0 });
-    const quotes = searchResult.quotes ?? [];
+    const quotes = (searchResult.quotes ?? []) as YahooSearchQuote[];
     const seen = new Set<string>();
     const allowedTypes = new Set(types && types.length ? types : ["equity", "etf", "etn", "index"]);
 
@@ -485,8 +497,8 @@ async function searchDirectlyOnYahoo(query: string, limit: number, types?: Asset
       mapped.push({
         name: quote.shortname ?? quote.longname ?? quote.symbol,
         ticker: quote.symbol.split(".")[0],
-        mic: quote.exchange,
-        exchangeCode: quote.exchangeDisplay,
+        mic: quote.exchange ?? undefined,
+        exchangeCode: quote.exchangeDisplay ?? undefined,
         assetType: assetType ?? "equity",
         yahooSymbol: quote.symbol,
         source: "yahoo"
@@ -622,10 +634,13 @@ async function buildPortfolioSnapshot(portfolioId: number = DEFAULT_PORTFOLIO_ID
     totalDailyPnL: totals.totalDailyPnL,
     positions: sortPositions(positionDtos)
   };
-}
-
-
-
+}
+
+
+
+
+
+
 
 
 

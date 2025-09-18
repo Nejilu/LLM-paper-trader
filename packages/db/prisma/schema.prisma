@@ -8,12 +8,14 @@ datasource db {
 }
 
 model Portfolio {
-  id            Int        @id @default(autoincrement())
-  name          String     @default("Default")
-  baseCurrency  String     @default("USD")
-  cashBalance   Decimal    @default(100000)
+  id            Int              @id @default(autoincrement())
+  name          String           @default("Default")
+  baseCurrency  String           @default("USD")
+  cashBalance   Decimal          @default(100000)
   positions     Position[]
   trades        Trade[]
+  prompts       PortfolioPrompt[]
+  llmExecutions LlmExecution[]
 }
 
 model Position {
@@ -46,5 +48,62 @@ model SymbolResolution {
   @@index([query])
 }
 
+model LlmProvider {
+  id          Int               @id @default(autoincrement())
+  name        String
+  type        String            @default("openai-compatible")
+  apiBase     String
+  apiKey      String?
+  model       String
+  temperature Float?            @default(0)
+  maxTokens   Int?
+  isDefault   Boolean           @default(false)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  prompts     PortfolioPrompt[]
+  executions  LlmExecution[]
 
+  @@index([isDefault])
+}
+
+model PortfolioPrompt {
+  id           Int            @id @default(autoincrement())
+  portfolioId  Int
+  providerId   Int?
+  name         String
+  description  String?
+  systemPrompt String
+  userTemplate String
+  isActive     Boolean        @default(true)
+  isDefault    Boolean        @default(false)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  portfolio    Portfolio      @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  provider     LlmProvider?   @relation(fields: [providerId], references: [id], onDelete: SetNull)
+  executions   LlmExecution[]
+
+  @@index([portfolioId])
+  @@index([providerId])
+}
+
+model LlmExecution {
+  id             Int              @id @default(autoincrement())
+  portfolioId    Int
+  promptId       Int?
+  providerId     Int?
+  status         String
+  requestPayload String
+  responseJson   String?
+  responseText   String?
+  errorMessage   String?
+  executedOrders String?
+  createdAt      DateTime         @default(now())
+  portfolio      Portfolio        @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  prompt         PortfolioPrompt? @relation(fields: [promptId], references: [id], onDelete: SetNull)
+  provider       LlmProvider?     @relation(fields: [providerId], references: [id], onDelete: SetNull)
+
+  @@index([portfolioId])
+  @@index([promptId])
+  @@index([providerId])
+}
 

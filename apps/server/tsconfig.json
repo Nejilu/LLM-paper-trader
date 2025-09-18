@@ -1,15 +1,4 @@
 {
-  "extends": "../../tsconfig.base.json",
-  "compilerOptions": {
-    "module": "CommonJS",
-    "target": "ES2021",
-    "lib": ["ES2021"],
-    "outDir": "dist",
-    "rootDir": "src",
-    "types": ["node"],
-    "noEmit": false,
-    "resolveJsonModule": true
-  },
-  "include": ["src", "test", "vitest.config.ts"],
-  "exclude": ["dist"]
+  "extends": "./tsconfig.dev.json"
 }
+

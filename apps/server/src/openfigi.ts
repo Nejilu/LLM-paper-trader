@@ -160,7 +160,7 @@ export class OpenFigiClient {
         return undefined;
       }
 
-      const payload: OpenFigiResponse = await response.json();
+      const payload = (await response.json()) as OpenFigiResponse;
       return payload;
     } catch (error) {
       console.error("OpenFIGI request error", error);
@@ -168,3 +168,4 @@ export class OpenFigiClient {
     }
   }
 }
+

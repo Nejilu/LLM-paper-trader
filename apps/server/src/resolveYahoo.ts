@@ -84,7 +84,7 @@ async function searchYahoo(options: ResolveYahooOptions): Promise<ResolvedSymbol
 
   try {
     const result = await yahooFinance.search(searchTerm, { quotesCount: 8, newsCount: 0 });
-    const quotes = result.quotes ?? [];
+    const quotes = (result.quotes ?? []) as YahooQuote[];
     if (!quotes.length) {
       return undefined;
     }
@@ -97,13 +97,13 @@ async function searchYahoo(options: ResolveYahooOptions): Promise<ResolvedSymbol
       .filter(({ score }) => score > 0)
       .sort((a, b) => b.score - a.score);
 
-    const best = (ranked[0] ?? quotes[0])?.quote;
-    if (!best?.symbol) {
+    const bestCandidate = ranked.length > 0 ? ranked[0].quote : quotes[0];
+    if (!bestCandidate?.symbol) {
       return undefined;
     }
 
     return {
-      yahooSymbol: best.symbol,
+      yahooSymbol: bestCandidate.symbol,
       source: "yahoo"
     };
   } catch (error) {
@@ -119,9 +119,16 @@ function buildYahooSearchTerm({ ticker, name, assetType }: ResolveYahooOptions) 
   return ticker ?? name ?? undefined;
 }
 
-type YahooQuote = Awaited<ReturnType<typeof yahooFinance.search>> extends { quotes: infer Q }
-  ? (Q extends (infer U)[] ? U : never)
-  : never;
+type YahooQuote = {
+  symbol?: string | null;
+  exchange?: string | null;
+  longname?: string | null;
+  shortname?: string | null;
+  typeDisp?: string | null;
+  index?: string | null;
+  name?: string | null;
+  [key: string]: unknown;
+};
 
 function scoreQuote(quote: YahooQuote, { ticker, mic, assetType, name }: ResolveYahooOptions): number {
   let score = 0;
@@ -159,3 +166,7 @@ function scoreQuote(quote: YahooQuote, { ticker, mic, assetType, name }: Resolve
 
   return score;
 }
+
+
+
+

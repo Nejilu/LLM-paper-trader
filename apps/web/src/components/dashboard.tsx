@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
@@ -128,6 +128,12 @@ export function Dashboard() {
           </p>
         </div>
         <div className="flex items-center gap-4">
+          <Link
+            href="/llm"
+            className="rounded-lg border border-border px-3 py-2 text-sm font-semibold text-muted-foreground transition hover:border-border hover:text-foreground"
+          >
+            LLM console
+          </Link>
           {portfoliosData && (
             <PortfolioManager
               currentPortfolio={portfolio || portfoliosData.portfolios[0]}
@@ -260,6 +266,11 @@ export function Dashboard() {
     </main>
   );
 }
+
+
+
+
+
 
 
 

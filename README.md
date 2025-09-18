@@ -16,6 +16,7 @@ Monorepo for a local-first paper trading desk covering global equities, ETFs/ETN
 
 - Global autocomplete backed by OpenFIGI with optional API key and Yahoo fallback to cover venues beyond the MIC mapping.
 - Persistent symbol resolution cache (SQLite) for auditability.
+- LLM planner pipeline (JSON-schema constrained): Express exposes provider/prompt/execution endpoints; Next.js console orchestrates runs and displays history.
 - Market data endpoints with in-memory TTL caching (5 min quotes / 15 min history) and optional Stooq EOD fallback (`ENABLE_STOOQ_FALLBACK`).
 - Portfolio endpoints to fetch current holdings, PnL, trade history, and to record simulated trades with weighted-average pricing logic.
 - Next.js dashboard with:
@@ -23,6 +24,7 @@ Monorepo for a local-first paper trading desk covering global equities, ETFs/ETN
   - Portfolio summary metrics, positions table, and a reconstructed equity curve.
   - Symbol detail pages with mini quote, historical chart (1M/6M/1Y), and inline trade form.
   - Trades page with filtering (date, symbol, side) and on-the-fly PnL estimates using latest prices.
+  - **LLM Automation Console** (`/llm`) to manage providers, prompts, manual runs, and execution history.
 - Vitest coverage for portfolio math and MIC mapping helpers.
 - ESLint + Prettier with strict TypeScript settings.
 
@@ -36,7 +38,9 @@ Monorepo for a local-first paper trading desk covering global equities, ETFs/ETN
 ### Installation
 
 ```bash
-pnpm install        # Triggers Prisma client generation
+pnpm install        # Installs deps (Prisma client generated automatically)
+# initialise / migrate the SQLite schema
+npx prisma@5.22.0 db push --schema packages/db/prisma/schema.prisma --skip-generate
 pnpm -w run dev     # Starts API (4000) and web app (5000) concurrently
 ```
 
@@ -56,9 +60,10 @@ SQLite data lives in `./data/trader.db`. Prisma creates the database file automa
 ### Useful scripts
 
 ```bash
-pnpm -w run lint              # ESLint across workspaces
-pnpm -w run test              # Runs Vitest suites (currently in apps/server)
+pnpm -w run lint                        # ESLint across workspaces
+pnpm -w run test                        # Runs Vitest suites (currently in apps/server)
 pnpm --filter @paper-trading/server test   # Focus on server tests
+pnpm --filter @paper-trading/server build  # Typecheck server with production tsconfig
 ```
 
 ## API snapshot
@@ -71,6 +76,11 @@ pnpm --filter @paper-trading/server test   # Focus on server tests
 | `GET /api/history?symbol=&range=&interval=` | Historical OHLCV data (default `range=1y`, `interval=1d`). |
 | `GET /api/portfolio` | Portfolio summary with positions and live PnL. |
 | `GET /api/trades` | Trade ledger (paper trades). |
+| `GET /api/llm/providers` | List configured LLM providers. |
+| `POST /api/llm/providers` | Create/update providers (DELETE `/api/llm/providers/:id`). |
+| `GET /api/portfolios/:id/prompts` | Manage portfolio prompt templates (POST/PUT/DELETE). |
+| `POST /api/portfolios/:id/llm/run` | Trigger the LLM pipeline (supports overrides & dry run). |
+| `GET /api/portfolios/:id/llm/executions` | Recent LLM executions for a portfolio. |
 | `POST /api/trades` | Record a trade `{ symbol, side, qty, price? }` (price optional -> uses latest quote). |
 
 Rate limiting: 60 req/min/IP. Quotes/histories cache responses in memory per TTL.
@@ -112,6 +122,7 @@ packages/
 ```
 
 Enjoy building strategies in a safe simulated environment!
+
 
 
 

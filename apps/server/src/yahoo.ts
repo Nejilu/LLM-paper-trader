@@ -22,7 +22,7 @@ export async function getQuote(symbol: string): Promise<QuoteResponse> {
   }
 
   try {
-    const quote = await yahooFinance.quote(normalized, { formatted: false });
+    const quote = await (yahooFinance as any).quote(normalized, { formatted: false });
     const payload: QuoteResponse = {
       symbol: quote.symbol ?? normalized,
       price: typeof quote.regularMarketPrice === "number" ? quote.regularMarketPrice : null,
@@ -54,13 +54,13 @@ export async function getHistory(symbol: string, range: string, interval: string
   }
 
   try {
-    const chart = await yahooFinance.chart(symbol, {
+    const chart = await (yahooFinance as any).chart(symbol, {
       range,
       interval,
       return: "object"
     });
     const quotes = chart.quotes ?? [];
-    const candles: HistoryCandle[] = quotes.map((point) => ({
+    const candles: HistoryCandle[] = quotes.map((point: any) => ({
       date: point.date ? point.date.toISOString() : new Date(point.timestamp * 1000).toISOString(),
       open: sanitizePoint(point.open),
       high: sanitizePoint(point.high),
@@ -170,3 +170,4 @@ function toStooqSymbol(symbol: string): string | null {
   }
   return `${base.toLowerCase()}.${stooqSuffix}`;
 }
+

@@ -1,0 +1,24 @@
+{
+    "extends":  "./tsconfig.dev.json",
+    "compilerOptions":  {
+                            "rootDir":  "src",
+                            "noEmit":  false,
+                            "paths":  {
+                                          "@paper-trading/server-shared":  [
+                                                                               "../../packages/server/dist"
+                                                                           ],
+                                          "@paper-trading/db":  [
+                                                                    "../../packages/db/dist"
+                                                                ]
+                                      }
+                        },
+    "include":  [
+                    "src"
+                ],
+    "exclude":  [
+                    "dist",
+                    "test",
+                    "**/*.test.ts",
+                    "vitest.config.ts"
+                ]
+}
