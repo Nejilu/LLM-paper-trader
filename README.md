@@ -1,4 +1,4 @@
-# Paper Trading LLM
+# LLM paper trader
 
 Monorepo for a local-first paper trading desk covering global equities, ETFs/ETNs, and indices. The project wires a Next.js dashboard to an Express API backed by Prisma + SQLite with live data from Yahoo Finance (unofficial) and OpenFIGI for universal symbol search.
 
