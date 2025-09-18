@@ -4,6 +4,14 @@ Monorepo for a local-first paper trading desk covering global equities, ETFs/ETN
 
 > **Legal notice**: Yahoo Finance data is unofficial and provided strictly for personal and educational use. Always validate prices with your broker before acting.
 
+## What’s new (LLM → JSON → Execution)
+
+- **LLM Automation Console** (Next.js): manage providers, per-portfolio prompts, manual runs, and execution history.
+- **Strict JSON output**: the LLM is forced to return an **arbitrage JSON** that is validated against a **JSON Schema** before any action.
+- **End-to-end runner** (Express): assembles context (positions, cash, history, quotes), calls the configured provider, validates the JSON, and **executes paper trades**.
+- **Providers & keys**: supports **OpenAI-compatible** endpoints (OpenAI, Perplexity API, Anyscale, vLLM proxy) and **local vLLM** via custom `apiBase`. Keys/configs are stored per provider.
+- **Persistence**: providers, prompts, and executions are persisted in SQLite (string-serialized payloads for compatibility).
+
 ## Stack
 
 - **pnpm workspaces** with apps and shared packages.
