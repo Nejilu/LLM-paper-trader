@@ -40,7 +40,7 @@ Monorepo for a local-first paper trading desk covering global equities, ETFs/ETN
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js ^20.19.0 or >=22.12.0
 - pnpm 9+
 
 ### Installation
