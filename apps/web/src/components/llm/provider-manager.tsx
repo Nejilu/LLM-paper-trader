@@ -224,8 +224,8 @@ export function LlmProviderManager() {
           Set as default provider
         </label>
         <div className="md:col-span-2">
-          <Button type="submit" disabled={createMutation.isLoading}>
-            {createMutation.isLoading ? "Creating..." : "Add provider"}
+          <Button type="submit" disabled={createMutation.isPending}>
+            {createMutation.isPending ? "Creating..." : "Add provider"}
           </Button>
         </div>
       </form>
@@ -361,8 +361,8 @@ export function LlmProviderManager() {
                         Set as default provider
                       </label>
                       <div className="flex gap-2 md:col-span-2">
-                        <Button type="submit" disabled={updateMutation.isLoading}>
-                          {updateMutation.isLoading ? "Saving..." : "Save changes"}
+                        <Button type="submit" disabled={updateMutation.isPending}>
+                          {updateMutation.isPending ? "Saving..." : "Save changes"}
                         </Button>
                         <Button type="button" variant="outline" onClick={cancelEditing}>
                           Cancel

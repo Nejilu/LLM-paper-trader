@@ -48,9 +48,11 @@ Monorepo for a local-first paper trading desk covering global equities, ETFs/ETN
 ```bash
 pnpm install        # Installs deps (Prisma client generated automatically)
 # initialise / migrate the SQLite schema
-npx prisma@5.22.0 db push --schema packages/db/prisma/schema.prisma --skip-generate
+pnpm --filter @paper-trading/db prisma:migrate
 pnpm -w run dev     # Starts API (4000) and web app (5000) concurrently
 ```
+
+> The server `dev`/`start` scripts automatically run `prisma migrate deploy` to keep the SQLite schema in sync before booting.
 
 The API listens on `http://localhost:4000` and the web UI on `http://localhost:5000`.
 
