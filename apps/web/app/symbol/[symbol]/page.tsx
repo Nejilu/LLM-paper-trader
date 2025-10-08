@@ -24,25 +24,25 @@ export default function SymbolPage() {
 
   const changeClass = quoteQuery.data?.change
     ? quoteQuery.data.change >= 0
-      ? "text-emerald-600"
-      : "text-rose-600"
-    : "text-slate-500";
+      ? "text-emerald-500"
+      : "text-rose-500"
+    : "text-muted-foreground";
 
   const historyCandles = useMemo(() => historyQuery.data?.candles ?? [], [historyQuery.data]);
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col gap-6 px-6 py-8">
-      <nav className="text-sm text-slate-500">
-        <Link href="/" className="hover:text-slate-700">
+      <nav className="text-sm text-muted-foreground">
+        <Link href="/" className="transition hover:text-foreground">
           Dashboard
         </Link>{" "}/ {symbol}
       </nav>
-      <header className="flex flex-col gap-2 border-b border-slate-100 pb-4">
+      <header className="flex flex-col gap-2 border-b border-border pb-4">
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-semibold text-slate-900">{symbol}</h1>
-          <span className="text-xs uppercase text-slate-500">{quoteQuery.data?.marketState}</span>
+          <h1 className="text-3xl font-semibold text-foreground">{symbol}</h1>
+          <span className="text-xs uppercase text-muted-foreground">{quoteQuery.data?.marketState}</span>
         </div>
-        <div className="text-2xl font-semibold text-slate-900">
+        <div className="text-2xl font-semibold text-foreground">
           {quoteQuery.data?.price !== null && quoteQuery.data?.price !== undefined
             ? quoteQuery.data.price.toLocaleString(undefined, { maximumFractionDigits: 2 })
             : "--"}
@@ -53,16 +53,18 @@ export default function SymbolPage() {
             : ""}
         </div>
       </header>
-      <section className="rounded-2xl bg-white p-6 shadow-sm">
+      <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold text-slate-900">Price History</h2>
+          <h2 className="text-base font-semibold text-foreground">Price History</h2>
           <div className="flex gap-2">
             {RANGE_OPTIONS.map((option) => (
               <button
                 key={option.value}
                 onClick={() => setRange(option.value)}
-                className={`rounded-md px-3 py-1 text-xs font-semibold ${
-                  range === option.value ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                className={`rounded-md px-3 py-1 text-xs font-semibold transition ${
+                  range === option.value
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground hover:bg-muted/80"
                 }`}
               >
                 {option.label}
@@ -74,13 +76,13 @@ export default function SymbolPage() {
           {historyCandles.length > 0 ? (
             <PriceChart candles={historyCandles} />
           ) : (
-            <p className="text-sm text-slate-500">No historical data for this range.</p>
+            <p className="text-sm text-muted-foreground">No historical data for this range.</p>
           )}
         </div>
       </section>
-      <section className="rounded-2xl bg-white p-6 shadow-sm">
-        <h2 className="text-base font-semibold text-slate-900">Add Trade</h2>
-        <p className="mb-3 text-sm text-slate-500">Record a simulated trade for {symbol}.</p>
+      <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+        <h2 className="text-base font-semibold text-foreground">Add Trade</h2>
+        <p className="mb-3 text-sm text-muted-foreground">Record a simulated trade for {symbol}.</p>
         <TradeForm symbol={symbol} />
       </section>
     </main>
