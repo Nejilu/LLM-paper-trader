@@ -164,6 +164,8 @@ export function LlmProviderManager() {
           >
             <option value="openai-compatible">OpenAI-compatible</option>
             <option value="local">Local</option>
+            <option value="google-gemini">Google Gemini</option>
+            <option value="anthropic">Anthropic</option>
           </select>
         </div>
         <div className="flex flex-col gap-1">
@@ -276,6 +278,8 @@ export function LlmProviderManager() {
                         >
                           <option value="openai-compatible">OpenAI-compatible</option>
                           <option value="local">Local</option>
+                          <option value="google-gemini">Google Gemini</option>
+                          <option value="anthropic">Anthropic</option>
                         </select>
                       </div>
                       <div className="flex flex-col gap-1">

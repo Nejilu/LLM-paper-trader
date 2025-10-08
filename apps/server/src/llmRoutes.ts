@@ -6,9 +6,11 @@ import { runLlmPlan } from "./llmService";
 import { ARBITRAGE_JSON_SCHEMA } from "./llmSchema";
 import { getPortfolioRecord, parsePortfolioIdStrict } from "./portfolioService";
 
-const providerInputSchema = z.object({
+export const providerInputSchema = z.object({
   name: z.string().min(1),
-  type: z.enum(["openai-compatible", "local"]).default("openai-compatible"),
+  type: z
+    .enum(["openai-compatible", "local", "google-gemini", "anthropic"])
+    .default("openai-compatible"),
   apiBase: z.string().min(1),
   apiKey: z.string().optional(),
   model: z.string().min(1),
@@ -17,9 +19,9 @@ const providerInputSchema = z.object({
   isDefault: z.boolean().optional()
 });
 
-const providerUpdateSchema = z.object({
+export const providerUpdateSchema = z.object({
   name: z.string().min(1).optional(),
-  type: z.enum(["openai-compatible", "local"]).optional(),
+  type: z.enum(["openai-compatible", "local", "google-gemini", "anthropic"]).optional(),
   apiBase: z.string().min(1).optional(),
   apiKey: z.union([z.string(), z.null()]).optional(),
   model: z.string().min(1).optional(),

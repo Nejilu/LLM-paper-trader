@@ -251,6 +251,23 @@ export async function callProvider(
     response_format?: { type: string };
   }
 ) {
+  switch (provider.type) {
+    case "google-gemini":
+      return callGeminiProvider(provider, payload);
+    case "anthropic":
+      return callAnthropicProvider(provider, payload);
+    case "openai-compatible":
+    case "local":
+      return callOpenAiCompatibleProvider(provider, payload);
+    default:
+      throw new Error(`Unsupported provider type: ${provider.type}`);
+  }
+}
+
+async function callOpenAiCompatibleProvider(
+  provider: LlmRunOptions["provider"],
+  payload: Parameters<typeof callProvider>[1]
+) {
   const requestUrl = buildChatCompletionsUrl(provider.apiBase);
   const baseBody: Record<string, unknown> = {
     model: payload.model,
@@ -303,6 +320,174 @@ export async function callProvider(
   }
 
   return { content, rawResponse: JSON.stringify(data) };
+}
+
+async function callGeminiProvider(
+  provider: LlmRunOptions["provider"],
+  payload: Parameters<typeof callProvider>[1]
+) {
+  const requestUrl = buildGeminiUrl(provider.apiBase, payload.model);
+  const { systemInstruction, contents } = splitMessagesForGemini(payload.messages);
+
+  const generationConfig: Record<string, unknown> = {};
+  if (typeof payload.temperature === "number") {
+    generationConfig.temperature = payload.temperature;
+  }
+  if (payload.max_tokens) {
+    generationConfig.maxOutputTokens = payload.max_tokens;
+  }
+
+  const body: Record<string, unknown> = {
+    contents
+  };
+  if (systemInstruction) {
+    body.systemInstruction = systemInstruction;
+  }
+  if (Object.keys(generationConfig).length > 0) {
+    body.generationConfig = generationConfig;
+  }
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json"
+  };
+  if (provider.apiKey) {
+    headers["x-goog-api-key"] = provider.apiKey;
+  }
+
+  const response = await fetch(requestUrl, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body)
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`LLM provider request failed (${response.status}): ${text}`);
+  }
+
+  const data = (await response.json()) as {
+    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+    error?: { message?: string };
+  };
+  if (data.error?.message) {
+    throw new Error(`LLM provider error: ${data.error.message}`);
+  }
+
+  const parts = data.candidates?.[0]?.content?.parts ?? [];
+  const content = parts.map((part) => part.text ?? "").join("").trim();
+  if (!content) {
+    throw new Error("LLM provider returned no content");
+  }
+
+  return { content, rawResponse: JSON.stringify(data) };
+}
+
+async function callAnthropicProvider(
+  provider: LlmRunOptions["provider"],
+  payload: Parameters<typeof callProvider>[1]
+) {
+  const requestUrl = buildAnthropicUrl(provider.apiBase);
+  const { system, messages } = splitMessagesForAnthropic(payload.messages);
+
+  const body: Record<string, unknown> = {
+    model: payload.model,
+    messages,
+    max_tokens: payload.max_tokens ?? 1024,
+    temperature: payload.temperature ?? 0
+  };
+  if (system) {
+    body.system = system;
+  }
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    "anthropic-version": "2023-06-01"
+  };
+  if (provider.apiKey) {
+    headers["x-api-key"] = provider.apiKey;
+  }
+
+  const response = await fetch(requestUrl, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body)
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`LLM provider request failed (${response.status}): ${text}`);
+  }
+
+  const data = (await response.json()) as {
+    content?: Array<{ type?: string; text?: string }>;
+    error?: { message?: string };
+  };
+  if (data.error?.message) {
+    throw new Error(`LLM provider error: ${data.error.message}`);
+  }
+
+  const text = (data.content ?? [])
+    .filter((part) => part.type === "text")
+    .map((part) => part.text ?? "")
+    .join("")
+    .trim();
+  if (!text) {
+    throw new Error("LLM provider returned no content");
+  }
+
+  return { content: text, rawResponse: JSON.stringify(data) };
+}
+
+function normalizeApiBase(apiBase: string) {
+  return apiBase.trim().replace(/\/+$/, "");
+}
+
+function buildGeminiUrl(apiBase: string, model: string) {
+  const base = normalizeApiBase(apiBase);
+  return `${base}/models/${encodeURIComponent(model)}:generateContent`;
+}
+
+function buildAnthropicUrl(apiBase: string) {
+  const base = normalizeApiBase(apiBase);
+  return `${base}/v1/messages`;
+}
+
+function splitMessagesForGemini(messages: ChatMessage[]) {
+  const systemText = messages
+    .filter((message) => message.role === "system")
+    .map((message) => message.content)
+    .join("\n\n")
+    .trim();
+
+  const contents = messages
+    .filter((message) => message.role !== "system")
+    .map((message) => ({
+      role: message.role,
+      parts: [{ text: message.content }]
+    }));
+
+  const systemInstruction = systemText
+    ? { role: "system" as const, parts: [{ text: systemText }] }
+    : undefined;
+
+  return { systemInstruction, contents };
+}
+
+function splitMessagesForAnthropic(messages: ChatMessage[]) {
+  const system = messages
+    .filter((message) => message.role === "system")
+    .map((message) => message.content)
+    .join("\n\n")
+    .trim();
+
+  const chatMessages = messages
+    .filter((message) => message.role !== "system")
+    .map((message) => ({
+      role: message.role === "user" ? "user" : "assistant",
+      content: [{ type: "text", text: message.content }]
+    }));
+
+  return { system: system || undefined, messages: chatMessages };
 }
 
 function parseArbitragePlan(content: string): ArbitragePlan {
