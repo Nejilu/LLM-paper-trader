@@ -21,7 +21,7 @@ export function Dashboard() {
   const { data: portfolio } = usePortfolio(currentPortfolioId ?? undefined);
   const { data: portfoliosData } = usePortfolios();
   const { data: tradesData } = useTrades(currentPortfolioId ?? undefined);
-  const equityQuery = useEquityCurve(portfolio?.positions ?? [], "6M");
+  const equityQuery = useEquityCurve(portfolio?.positions ?? [], "6mo");
   const quoteQuery = useQuote(selectedSymbol ?? undefined);
   const latestTrades = tradesData?.trades.slice(0, 5) ?? [];
 

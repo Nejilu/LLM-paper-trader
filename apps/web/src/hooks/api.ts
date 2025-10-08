@@ -105,7 +105,7 @@ export function useQuote(symbol?: string) {
   });
 }
 
-export function useHistory(symbol?: string, range = "6M", interval = "1d") {
+export function useHistory(symbol?: string, range = "6mo", interval = "1d") {
   return useQuery({
     queryKey: ["history", symbol, range, interval],
     enabled: Boolean(symbol),
@@ -169,7 +169,7 @@ export interface EquityPoint {
   value: number;
 }
 
-export function useEquityCurve(positions: PortfolioPosition[], range = "6M") {
+export function useEquityCurve(positions: PortfolioPosition[], range = "6mo") {
   const symbols = useMemo(() => positions.map((position) => position.symbol).sort(), [positions]);
   return useQuery({
     queryKey: ["equity-curve", symbols, range],
