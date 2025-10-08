@@ -105,13 +105,38 @@ export function useQuote(symbol?: string) {
   });
 }
 
+function normalizeHistoryRange(range: string) {
+  switch (range.toLowerCase()) {
+    case "1m":
+    case "1mo":
+      return "1mo";
+    case "3m":
+    case "3mo":
+      return "3mo";
+    case "6m":
+    case "6mo":
+      return "6mo";
+    case "1y":
+      return "1y";
+    case "2y":
+      return "2y";
+    case "5y":
+      return "5y";
+    case "max":
+      return "max";
+    default:
+      return range;
+  }
+}
+
 export function useHistory(symbol?: string, range = "6M", interval = "1d") {
+  const normalizedRange = normalizeHistoryRange(range);
   return useQuery({
-    queryKey: ["history", symbol, range, interval],
+    queryKey: ["history", symbol, normalizedRange, interval],
     enabled: Boolean(symbol),
     queryFn: () =>
       apiFetch<{ candles: HistoryCandle[] }>(
-        `/api/history?symbol=${encodeURIComponent(symbol ?? "")}&range=${range}&interval=${interval}`
+        `/api/history?symbol=${encodeURIComponent(symbol ?? "")}&range=${normalizedRange}&interval=${interval}`
       ),
     staleTime: 5 * 60_000
   });
@@ -170,15 +195,16 @@ export interface EquityPoint {
 }
 
 export function useEquityCurve(positions: PortfolioPosition[], range = "6M") {
+  const normalizedRange = normalizeHistoryRange(range);
   const symbols = useMemo(() => positions.map((position) => position.symbol).sort(), [positions]);
   return useQuery({
-    queryKey: ["equity-curve", symbols, range],
+    queryKey: ["equity-curve", symbols, normalizedRange],
     enabled: symbols.length > 0,
     queryFn: async () => {
       const histories = await Promise.all(
         positions.map((position) =>
           apiFetch<{ candles: HistoryCandle[] }>(
-            `/api/history?symbol=${encodeURIComponent(position.symbol)}&range=${range}&interval=1d`
+            `/api/history?symbol=${encodeURIComponent(position.symbol)}&range=${normalizedRange}&interval=1d`
           )
         )
       );
