@@ -46,8 +46,33 @@ export async function getQuote(symbol: string): Promise<QuoteResponse> {
   }
 }
 
+function normalizeRange(range: string) {
+  switch (range.toLowerCase()) {
+    case "1m":
+    case "1mo":
+      return "1mo";
+    case "3m":
+    case "3mo":
+      return "3mo";
+    case "6m":
+    case "6mo":
+      return "6mo";
+    case "1y":
+      return "1y";
+    case "2y":
+      return "2y";
+    case "5y":
+      return "5y";
+    case "max":
+      return "max";
+    default:
+      return range;
+  }
+}
+
 export async function getHistory(symbol: string, range: string, interval: string): Promise<HistoryCandle[]> {
-  const key = `${symbol}|${range}|${interval}`;
+  const normalizedRange = normalizeRange(range);
+  const key = `${symbol}|${normalizedRange}|${interval}`;
   const cached = historyCache.get(key);
   if (cached) {
     return cached;
@@ -55,7 +80,7 @@ export async function getHistory(symbol: string, range: string, interval: string
 
   try {
     const chart = await (yahooFinance as any).chart(symbol, {
-      range,
+      range: normalizedRange,
       interval,
       return: "object"
     });
