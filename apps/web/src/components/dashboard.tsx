@@ -19,12 +19,17 @@ export function Dashboard() {
   const queryClient = useQueryClient();
 
   const { data: portfolio } = usePortfolio(currentPortfolioId ?? undefined);
-  const { data: portfoliosData } = usePortfolios();
+  const {
+    data: portfoliosData,
+    isLoading: isPortfoliosLoading,
+    isFetching: isPortfoliosFetching
+  } = usePortfolios();
   const { data: tradesData } = useTrades(currentPortfolioId ?? undefined);
   const equityQuery = useEquityCurve(portfolio?.positions ?? [], "6M");
   const quoteQuery = useQuote(selectedSymbol ?? undefined);
   const latestTrades = tradesData?.trades.slice(0, 5) ?? [];
   const portfolios = portfoliosData?.portfolios ?? [];
+  const isPortfoliosPending = (isPortfoliosLoading || isPortfoliosFetching) && portfolios.length === 0;
   const firstPortfolioId = portfolios[0]?.id;
 
   // Auto-select first portfolio if none is selected
@@ -136,18 +141,17 @@ export function Dashboard() {
           >
             LLM console
           </Link>
-          {portfolios.length > 0 && (
-            <PortfolioManager
-              currentPortfolio={portfolio ?? portfolios[0]!}
-              onPortfolioChange={handlePortfolioChange}
-              onPortfolioCreate={handlePortfolioCreate}
-              onPortfolioDelete={handlePortfolioDelete}
-              onPortfolioReset={handlePortfolioReset}
-              onExportPortfolio={handleExportPortfolio}
-              onImportPortfolio={handleImportPortfolio}
-              portfolios={portfolios}
-            />
-          )}
+          <PortfolioManager
+            currentPortfolio={portfolio ?? portfolios[0] ?? null}
+            onPortfolioChange={handlePortfolioChange}
+            onPortfolioCreate={handlePortfolioCreate}
+            onPortfolioDelete={handlePortfolioDelete}
+            onPortfolioReset={handlePortfolioReset}
+            onExportPortfolio={handleExportPortfolio}
+            onImportPortfolio={handleImportPortfolio}
+            portfolios={portfolios}
+            isLoading={isPortfoliosPending}
+          />
           <ThemeToggle />
         </div>
       </header>

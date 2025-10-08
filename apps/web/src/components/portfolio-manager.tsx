@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState } from "react";
+import { useState, type ChangeEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -14,7 +14,7 @@ interface Portfolio {
 }
 
 interface PortfolioManagerProps {
-  currentPortfolio: Portfolio;
+  currentPortfolio?: Portfolio | null;
   onPortfolioChange: (portfolioId: number) => void;
   onPortfolioCreate: (name: string, baseCurrency: string) => void;
   onPortfolioDelete: (portfolioId: number) => void;
@@ -22,6 +22,7 @@ interface PortfolioManagerProps {
   onExportPortfolio: (portfolioId: number) => void;
   onImportPortfolio: (data: unknown) => void;
   portfolios: Portfolio[];
+  isLoading?: boolean;
 }
 
 export function PortfolioManager({
@@ -32,11 +33,15 @@ export function PortfolioManager({
   onPortfolioReset,
   onExportPortfolio,
   onImportPortfolio,
-  portfolios
+  portfolios,
+  isLoading = false
 }: PortfolioManagerProps) {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newPortfolioName, setNewPortfolioName] = useState("");
   const [newPortfolioCurrency, setNewPortfolioCurrency] = useState("USD");
+
+  const hasPortfolios = portfolios.length > 0;
+  const activePortfolio = currentPortfolio ?? (hasPortfolios ? portfolios[0] : null);
 
   const handleCreatePortfolio = () => {
     if (newPortfolioName.trim()) {
@@ -46,7 +51,18 @@ export function PortfolioManager({
     }
   };
 
-  const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePortfolioSelect = (event: ChangeEvent<HTMLSelectElement>) => {
+    const value = event.target.value;
+    if (!value) {
+      return;
+    }
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isNaN(parsed)) {
+      onPortfolioChange(parsed);
+    }
+  };
+
+  const handleFileImport = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       const reader = new FileReader();
@@ -67,15 +83,22 @@ export function PortfolioManager({
       {/* Portfolio Selector */}
       <div className="relative">
         <select
-          value={currentPortfolio.id}
-          onChange={(e) => onPortfolioChange(Number(e.target.value))}
-          className="appearance-none rounded-lg border border-border bg-card px-4 py-2 pr-8 text-sm font-medium text-foreground focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200 dark:border-border dark:bg-card dark:text-foreground min-w-[200px]"
+          value={activePortfolio?.id?.toString() ?? ""}
+          onChange={handlePortfolioSelect}
+          disabled={isLoading || !hasPortfolios}
+          className="appearance-none rounded-lg border border-border bg-card px-4 py-2 pr-8 text-sm font-medium text-foreground focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200 disabled:cursor-not-allowed disabled:text-muted-foreground dark:border-border dark:bg-card dark:text-foreground min-w-[200px]"
         >
-          {portfolios.map((portfolio) => (
-            <option key={portfolio.id} value={portfolio.id}>
-              {portfolio.name} ({portfolio.baseCurrency})
-            </option>
-          ))}
+          {isLoading ? (
+            <option value="">Loading portfolios...</option>
+          ) : hasPortfolios ? (
+            portfolios.map((portfolio) => (
+              <option key={portfolio.id} value={portfolio.id}>
+                {portfolio.name} ({portfolio.baseCurrency})
+              </option>
+            ))
+          ) : (
+            <option value="">No portfolios yet</option>
+          )}
         </select>
         <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground">
           <svg className="h-4 w-4 fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
@@ -136,8 +159,9 @@ export function PortfolioManager({
       <Button
         variant="outline"
         size="sm"
-        onClick={() => onPortfolioReset(currentPortfolio.id)}
+        onClick={() => activePortfolio && onPortfolioReset(activePortfolio.id)}
         title="Reset current portfolio"
+        disabled={!activePortfolio}
       >
         <RotateCcw className="h-4 w-4" />
       </Button>
@@ -146,9 +170,9 @@ export function PortfolioManager({
       <Button
         variant="outline"
         size="sm"
-        onClick={() => onPortfolioDelete(currentPortfolio.id)}
+        onClick={() => activePortfolio && onPortfolioDelete(activePortfolio.id)}
         title="Delete current portfolio"
-        disabled={portfolios.length <= 1}
+        disabled={!activePortfolio || portfolios.length <= 1}
       >
         <Trash2 className="h-4 w-4" />
       </Button>
@@ -157,8 +181,9 @@ export function PortfolioManager({
       <Button
         variant="outline"
         size="sm"
-        onClick={() => onExportPortfolio(currentPortfolio.id)}
+        onClick={() => activePortfolio && onExportPortfolio(activePortfolio.id)}
         title="Export portfolio data"
+        disabled={!activePortfolio}
       >
         <Download className="h-4 w-4" />
       </Button>
