@@ -349,7 +349,11 @@ interface ExecutionsResponse {
   executions: LlmExecutionDto[];
 }
 
-type LlmProviderType = "openai-compatible" | "local" | "google-gemini" | "anthropic";
+export type LlmProviderType =
+  | "openai-compatible"
+  | "local"
+  | "google-gemini"
+  | "anthropic";
 
 interface CreateProviderInput {
   name: string;

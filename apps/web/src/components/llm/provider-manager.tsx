@@ -1,14 +1,20 @@
 ﻿"use client";
 
 import { FormEvent, useMemo, useState } from "react";
-import { useCreateLlmProvider, useDeleteLlmProvider, useLlmProviders, useUpdateLlmProvider } from "@/hooks/api";
+import {
+  type LlmProviderType,
+  useCreateLlmProvider,
+  useDeleteLlmProvider,
+  useLlmProviders,
+  useUpdateLlmProvider
+} from "@/hooks/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 interface ProviderDraft {
   name: string;
-  type: string;
+  type: LlmProviderType;
   apiBase: string;
   apiKey: string;
   model: string;
@@ -160,7 +166,9 @@ export function LlmProviderManager() {
             id="provider-type"
             className="rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground"
             value={draft.type}
-            onChange={(event) => setDraft((prev) => ({ ...prev, type: event.target.value }))}
+            onChange={(event) =>
+              setDraft((prev) => ({ ...prev, type: event.target.value as LlmProviderType }))
+            }
           >
             <option value="openai-compatible">OpenAI-compatible</option>
             <option value="local">Local</option>
@@ -272,7 +280,9 @@ export function LlmProviderManager() {
                           value={editingDraft.type}
                           onChange={(event) =>
                             setEditingDraft((prev) =>
-                              prev ? { ...prev, type: event.target.value } : prev
+                              prev
+                                ? { ...prev, type: event.target.value as LlmProviderType }
+                                : prev
                             )
                           }
                         >
