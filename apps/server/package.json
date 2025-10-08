@@ -3,7 +3,9 @@
     "version": "0.0.0",
     "private": true,
     "scripts": {
+        "predev": "pnpm --filter @paper-trading/db prisma:migrate",
         "dev": "tsx watch src/index.ts",
+        "prestart": "pnpm --filter @paper-trading/db prisma:migrate",
         "build": "tsc -p tsconfig.build.json",
         "start": "node dist/index.js",
         "lint": "eslint \"src/**/*.ts\"",
