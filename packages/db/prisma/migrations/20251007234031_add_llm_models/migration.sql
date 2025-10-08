@@ -1,5 +1,5 @@
 -- CreateTable
-CREATE TABLE "Portfolio" (
+CREATE TABLE IF NOT EXISTS "Portfolio" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "name" TEXT NOT NULL DEFAULT 'Default',
     "baseCurrency" TEXT NOT NULL DEFAULT 'USD',
@@ -7,7 +7,7 @@ CREATE TABLE "Portfolio" (
 );
 
 -- CreateTable
-CREATE TABLE "Position" (
+CREATE TABLE IF NOT EXISTS "Position" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "portfolioId" INTEGER NOT NULL,
     "symbol" TEXT NOT NULL,
@@ -17,7 +17,7 @@ CREATE TABLE "Position" (
 );
 
 -- CreateTable
-CREATE TABLE "Trade" (
+CREATE TABLE IF NOT EXISTS "Trade" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "portfolioId" INTEGER NOT NULL,
     "symbol" TEXT NOT NULL,
@@ -29,7 +29,7 @@ CREATE TABLE "Trade" (
 );
 
 -- CreateTable
-CREATE TABLE "SymbolResolution" (
+CREATE TABLE IF NOT EXISTS "SymbolResolution" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "query" TEXT NOT NULL,
     "resultSymbol" TEXT NOT NULL,
@@ -38,7 +38,7 @@ CREATE TABLE "SymbolResolution" (
 );
 
 -- CreateTable
-CREATE TABLE "LlmProvider" (
+CREATE TABLE IF NOT EXISTS "LlmProvider" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "name" TEXT NOT NULL,
     "type" TEXT NOT NULL DEFAULT 'openai-compatible',
@@ -49,11 +49,11 @@ CREATE TABLE "LlmProvider" (
     "maxTokens" INTEGER,
     "isDefault" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
+    "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- CreateTable
-CREATE TABLE "PortfolioPrompt" (
+CREATE TABLE IF NOT EXISTS "PortfolioPrompt" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "portfolioId" INTEGER NOT NULL,
     "providerId" INTEGER,
@@ -64,13 +64,13 @@ CREATE TABLE "PortfolioPrompt" (
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "isDefault" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
+    "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "PortfolioPrompt_portfolioId_fkey" FOREIGN KEY ("portfolioId") REFERENCES "Portfolio" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT "PortfolioPrompt_providerId_fkey" FOREIGN KEY ("providerId") REFERENCES "LlmProvider" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
 -- CreateTable
-CREATE TABLE "LlmExecution" (
+CREATE TABLE IF NOT EXISTS "LlmExecution" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "portfolioId" INTEGER NOT NULL,
     "promptId" INTEGER,
@@ -88,22 +88,22 @@ CREATE TABLE "LlmExecution" (
 );
 
 -- CreateIndex
-CREATE INDEX "SymbolResolution_query_idx" ON "SymbolResolution"("query");
+CREATE INDEX IF NOT EXISTS "SymbolResolution_query_idx" ON "SymbolResolution"("query");
 
 -- CreateIndex
-CREATE INDEX "LlmProvider_isDefault_idx" ON "LlmProvider"("isDefault");
+CREATE INDEX IF NOT EXISTS "LlmProvider_isDefault_idx" ON "LlmProvider"("isDefault");
 
 -- CreateIndex
-CREATE INDEX "PortfolioPrompt_portfolioId_idx" ON "PortfolioPrompt"("portfolioId");
+CREATE INDEX IF NOT EXISTS "PortfolioPrompt_portfolioId_idx" ON "PortfolioPrompt"("portfolioId");
 
 -- CreateIndex
-CREATE INDEX "PortfolioPrompt_providerId_idx" ON "PortfolioPrompt"("providerId");
+CREATE INDEX IF NOT EXISTS "PortfolioPrompt_providerId_idx" ON "PortfolioPrompt"("providerId");
 
 -- CreateIndex
-CREATE INDEX "LlmExecution_portfolioId_idx" ON "LlmExecution"("portfolioId");
+CREATE INDEX IF NOT EXISTS "LlmExecution_portfolioId_idx" ON "LlmExecution"("portfolioId");
 
 -- CreateIndex
-CREATE INDEX "LlmExecution_promptId_idx" ON "LlmExecution"("promptId");
+CREATE INDEX IF NOT EXISTS "LlmExecution_promptId_idx" ON "LlmExecution"("promptId");
 
 -- CreateIndex
-CREATE INDEX "LlmExecution_providerId_idx" ON "LlmExecution"("providerId");
+CREATE INDEX IF NOT EXISTS "LlmExecution_providerId_idx" ON "LlmExecution"("providerId");
