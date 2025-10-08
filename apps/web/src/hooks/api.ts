@@ -230,7 +230,7 @@ export function useEquityCurve(positions: PortfolioPosition[], range = "6M") {
 export interface LlmProvider {
   id: number;
   name: string;
-  type: "openai-compatible" | "local" | string;
+  type: LlmProviderType;
   apiBase: string;
   model: string;
   temperature: number | null;
@@ -349,9 +349,15 @@ interface ExecutionsResponse {
   executions: LlmExecutionDto[];
 }
 
+export type LlmProviderType =
+  | "openai-compatible"
+  | "local"
+  | "google-gemini"
+  | "anthropic";
+
 interface CreateProviderInput {
   name: string;
-  type: "openai-compatible" | "local" | string;
+  type: LlmProviderType;
   apiBase: string;
   apiKey?: string;
   model: string;
