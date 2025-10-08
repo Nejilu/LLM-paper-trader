@@ -150,8 +150,8 @@ export function LlmRunnerPanel({ portfolioId }: Props) {
           Dry run (do not execute trades)
         </label>
         <div className="md:col-span-2 flex gap-2">
-          <Button type="submit" disabled={runMutation.isLoading}>
-            {runMutation.isLoading ? "Running..." : "Run LLM"}
+          <Button type="submit" disabled={runMutation.isPending}>
+            {runMutation.isPending ? "Running..." : "Run LLM"}
           </Button>
           <Button type="button" variant="outline" onClick={() => setResult(null)}>
             Clear result

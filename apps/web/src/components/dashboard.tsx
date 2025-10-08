@@ -24,13 +24,15 @@ export function Dashboard() {
   const equityQuery = useEquityCurve(portfolio?.positions ?? [], "6M");
   const quoteQuery = useQuote(selectedSymbol ?? undefined);
   const latestTrades = tradesData?.trades.slice(0, 5) ?? [];
+  const portfolios = portfoliosData?.portfolios ?? [];
+  const firstPortfolioId = portfolios[0]?.id;
 
   // Auto-select first portfolio if none is selected
   useEffect(() => {
-    if (!currentPortfolioId && portfoliosData?.portfolios?.length > 0) {
-      setCurrentPortfolioId(portfoliosData.portfolios[0].id);
+    if (!currentPortfolioId && firstPortfolioId !== undefined) {
+      setCurrentPortfolioId(firstPortfolioId);
     }
-  }, [portfoliosData, currentPortfolioId]);
+  }, [firstPortfolioId, currentPortfolioId]);
 
   const handlePortfolioChange = (portfolioId: number) => {
     setCurrentPortfolioId(portfolioId);
@@ -134,16 +136,16 @@ export function Dashboard() {
           >
             LLM console
           </Link>
-          {portfoliosData && (
+          {portfolios.length > 0 && (
             <PortfolioManager
-              currentPortfolio={portfolio || portfoliosData.portfolios[0]}
+              currentPortfolio={portfolio ?? portfolios[0]!}
               onPortfolioChange={handlePortfolioChange}
               onPortfolioCreate={handlePortfolioCreate}
               onPortfolioDelete={handlePortfolioDelete}
               onPortfolioReset={handlePortfolioReset}
               onExportPortfolio={handleExportPortfolio}
               onImportPortfolio={handleImportPortfolio}
-              portfolios={portfoliosData.portfolios}
+              portfolios={portfolios}
             />
           )}
           <ThemeToggle />

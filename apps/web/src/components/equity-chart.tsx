@@ -14,6 +14,7 @@ import "chartjs-adapter-date-fns";
 import { Line } from "react-chartjs-2";
 import { useMemo } from "react";
 import type { EquityPoint } from "@/hooks/api";
+import type { ChartOptions, TooltipItem } from "chart.js";
 
 ChartJS.register(CategoryScale, LinearScale, TimeScale, PointElement, LineElement, Tooltip, Legend);
 
@@ -38,7 +39,7 @@ export function EquityChart({ data }: EquityChartProps) {
     [data]
   );
 
-  const options = useMemo(
+  const options = useMemo<ChartOptions<"line">>(
     () => ({
       responsive: true,
       maintainAspectRatio: false,
@@ -48,8 +49,18 @@ export function EquityChart({ data }: EquityChartProps) {
         legend: { display: false },
         tooltip: {
           callbacks: {
-            label: (context: { parsed: number }) =>
-              `Equity: ${context.parsed.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+            label: (context: TooltipItem<"line">) => {
+              const parsedValue =
+                typeof context.parsed === "number"
+                  ? context.parsed
+                  : typeof context.parsed === "object" && context.parsed !== null && "y" in context.parsed
+                    ? Number((context.parsed as { y: number }).y)
+                    : null;
+
+              return parsedValue !== null
+                ? `Equity: ${parsedValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+                : "Equity";
+            }
           }
         }
       },

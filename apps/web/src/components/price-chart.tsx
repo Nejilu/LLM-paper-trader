@@ -14,6 +14,7 @@ import "chartjs-adapter-date-fns";
 import { Line } from "react-chartjs-2";
 import { useMemo } from "react";
 import type { HistoryCandle } from "@/hooks/api";
+import type { ChartOptions } from "chart.js";
 
 ChartJS.register(CategoryScale, LinearScale, TimeScale, PointElement, LineElement, Tooltip, Legend);
 
@@ -39,7 +40,7 @@ export function PriceChart({ candles }: PriceChartProps) {
     [candles]
   );
 
-  const options = useMemo(
+  const options = useMemo<ChartOptions<"line">>(
     () => ({
       responsive: true,
       maintainAspectRatio: false,
@@ -50,7 +51,7 @@ export function PriceChart({ candles }: PriceChartProps) {
       scales: {
         x: {
           type: "time" as const,
-          time: { unit: "month" }
+          time: { unit: "month" as const }
         }
       }
     }),

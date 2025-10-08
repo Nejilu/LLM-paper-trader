@@ -222,8 +222,8 @@ export function PortfolioPromptManager({ portfolioId }: Props) {
             Prompt is active
           </label>
         </div>
-        <Button type="submit" disabled={createMutation.isLoading}>
-          {createMutation.isLoading ? "Creating..." : "Save prompt"}
+        <Button type="submit" disabled={createMutation.isPending}>
+          {createMutation.isPending ? "Creating..." : "Save prompt"}
         </Button>
       </form>
 
@@ -343,8 +343,8 @@ export function PortfolioPromptManager({ portfolioId }: Props) {
                         </label>
                       </div>
                       <div className="flex gap-2">
-                        <Button type="submit" disabled={updateMutation.isLoading}>
-                          {updateMutation.isLoading ? "Saving..." : "Save"}
+                        <Button type="submit" disabled={updateMutation.isPending}>
+                          {updateMutation.isPending ? "Saving..." : "Save"}
                         </Button>
                         <Button type="button" variant="outline" onClick={cancelEdit}>
                           Cancel

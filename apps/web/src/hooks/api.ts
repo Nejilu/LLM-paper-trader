@@ -334,9 +334,9 @@ interface CreateProviderInput {
   isDefault?: boolean;
 }
 
-interface UpdateProviderInput extends Partial<CreateProviderInput> {
+type UpdateProviderInput = Omit<Partial<CreateProviderInput>, "apiKey"> & {
   apiKey?: string | null;
-}
+};
 
 interface CreatePromptInput {
   name: string;
@@ -348,12 +348,15 @@ interface CreatePromptInput {
   isActive?: boolean;
 }
 
-interface UpdatePromptInput extends Partial<CreatePromptInput> {
+type UpdatePromptInput = Omit<
+  Partial<CreatePromptInput>,
+  "providerId" | "description" | "systemPrompt" | "userTemplate"
+> & {
   providerId?: number | null;
   description?: string | null;
   systemPrompt?: string | null;
   userTemplate?: string | null;
-}
+};
 
 export function useLlmProviders() {
   return useQuery({
