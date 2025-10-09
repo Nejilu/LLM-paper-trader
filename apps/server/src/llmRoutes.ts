@@ -2,7 +2,7 @@
 import { prisma } from "@paper-trading/db";
 import type { LlmExecution, LlmProvider, PortfolioPrompt as PrismaPortfolioPrompt } from "@paper-trading/db";
 import { z } from "zod";
-import { runLlmPlan } from "./llmService";
+import { LlmPlanExecutionError, runLlmPlan } from "./llmService";
 import { ARBITRAGE_JSON_SCHEMA } from "./llmSchema";
 import { getPortfolioRecord, parsePortfolioIdStrict } from "./portfolioService";
 
@@ -396,16 +396,29 @@ export function registerLlmRoutes(app: Application) {
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : "LLM run failed";
+        const updateData: Parameters<typeof prisma.llmExecution.update>[0]["data"] = {
+          status: "error",
+          errorMessage: message
+        };
+
+        if (error instanceof LlmPlanExecutionError) {
+          updateData.responseText = error.result.assistantMessage;
+          updateData.responseJson = JSON.stringify(error.result.plan);
+          updateData.executedOrders = JSON.stringify(error.result.trades);
+        } else if (error instanceof Error && "stack" in error) {
+          updateData.responseText = String(error.stack);
+        }
+
         await prisma.llmExecution.update({
           where: { id: execution.id },
-          data: {
-            status: "error",
-            errorMessage: message,
-            responseText: error instanceof Error && "stack" in error ? String(error.stack) : null
-          }
+          data: updateData
         });
         console.error("LLM run failed", error);
-        res.status(400).json({ error: message });
+        if (error instanceof LlmPlanExecutionError) {
+          res.status(400).json({ error: message, plan: error.result.plan, trades: error.result.trades });
+        } else {
+          res.status(400).json({ error: message });
+        }
       }
     } catch (error) {
       console.error("Run LLM pipeline failed", error);

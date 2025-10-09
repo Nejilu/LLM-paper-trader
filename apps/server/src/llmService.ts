@@ -111,6 +111,20 @@ export interface LlmRunResult {
   context: ExecutionContext;
 }
 
+export class LlmPlanExecutionError extends Error {
+  result: Omit<LlmRunResult, "executed" | "snapshot"> & { executed: false };
+
+  constructor(
+    message: string,
+    result: Omit<LlmRunResult, "executed" | "snapshot"> & { executed: false },
+    options?: { cause?: unknown }
+  ) {
+    super(message, options);
+    this.name = "LlmPlanExecutionError";
+    this.result = result;
+  }
+}
+
 export async function runLlmPlan(options: LlmRunOptions): Promise<LlmRunResult> {
   const { portfolioId, prompt, provider, overrides, dryRun = false } = options;
   await getPortfolioRecord(portfolioId);
@@ -137,34 +151,34 @@ export async function runLlmPlan(options: LlmRunOptions): Promise<LlmRunResult> 
   const plan = parseArbitragePlan(content);
   const trades = await buildTradesFromPlan(plan, context);
 
-  if (dryRun || trades.length === 0) {
-    return {
-      plan,
-      rawResponse,
-      assistantMessage: content,
-      trades,
-      executed: false,
-      systemPrompt,
-      userPrompt,
-      messages,
-      context
-    };
-  }
-
-  await executeTradeInputs(trades, portfolioId);
-  const snapshot = await buildPortfolioSnapshot(portfolioId);
-
-  return {
+  const baseResult: Omit<LlmRunResult, "executed" | "snapshot"> & { executed: false } = {
     plan,
     rawResponse,
     assistantMessage: content,
     trades,
-    executed: true,
-    snapshot,
+    executed: false,
     systemPrompt,
     userPrompt,
     messages,
     context
+  };
+
+  if (dryRun || trades.length === 0) {
+    return baseResult;
+  }
+
+  try {
+    await executeTradeInputs(trades, portfolioId);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to execute trades";
+    throw new LlmPlanExecutionError(message, baseResult, { cause: error });
+  }
+  const snapshot = await buildPortfolioSnapshot(portfolioId);
+
+  return {
+    ...baseResult,
+    executed: true,
+    snapshot,
   };
 }
 
