@@ -147,17 +147,17 @@ export async function runLlmPlan(options: LlmRunOptions): Promise<LlmRunResult> 
     { role: "user", content: userPrompt }
   ];
 
-  const llmPayload = {
-    model: overrides?.model ?? provider.model,
-    temperature: overrides?.temperature ?? provider.temperature ?? 0,
-    max_tokens: overrides?.maxTokens ?? provider.maxTokens ?? undefined,
-    messages,
-    response_format: { type: "json_object" }
-  } as const;
-
   for (let attempt = 1; attempt <= MAX_PLAN_ATTEMPTS; attempt++) {
     try {
-      const { content, rawResponse } = await callProvider(provider, llmPayload);
+      const payload = {
+        model: overrides?.model ?? provider.model,
+        temperature: overrides?.temperature ?? provider.temperature ?? 0,
+        max_tokens: overrides?.maxTokens ?? provider.maxTokens ?? undefined,
+        messages,
+        response_format: { type: "json_object" }
+      } as const;
+
+      const { content, rawResponse } = await callProvider(provider, payload);
       messages.push({ role: "assistant", content });
 
       const plan = parseArbitragePlan(content);
@@ -206,6 +206,8 @@ export async function runLlmPlan(options: LlmRunOptions): Promise<LlmRunResult> 
       if (retryInstruction) {
         messages.push({ role: "user", content: retryInstruction });
       }
+
+      continue;
     }
   }
 
