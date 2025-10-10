@@ -11,11 +11,14 @@ import {
 import { ARBITRAGE_JSON_SCHEMA, ArbitrageOrder, ArbitragePlan, arbitragePlanSchema } from "./llmSchema";
 import { getHistory, getQuote } from "./yahoo";
 
-const BASE_SYSTEM_PROMPT = `You are an automated portfolio manager executing paper trades for backtesting purposes. Follow the risk constraints embedded in the user's instructions. You MUST reply with a single JSON document that validates against the provided JSON Schema. Do not include markdown fences or any commentary.`;
+const BASE_SYSTEM_PROMPT = `You are an automated portfolio manager executing paper trades for backtesting purposes. Follow the risk constraints embedded in the user's instructions. You MUST reply with a single JSON document that validates against the provided JSON Schema. Do not include markdown fences or any commentary. Ensure BUY orders never exceed the available portfolio cash balance (including estimated fees/slippage).`;
 
 const DEFAULT_USER_TEMPLATE = `Current UTC time: {{CURRENT_DATETIME}}
 Portfolio snapshot (positions with market values):
 {{PORTFOLIO_JSON}}
+
+Available cash balance: {{BASE_CURRENCY}} {{CASH_BALANCE}}.
+You must size BUY orders so the total cost including the 0.10% fee/slippage assumption stays within this cash balance. If funds are insufficient, skip or scale back the trade instead of overspending.
 
 Latest market quotes for held symbols:
 {{QUOTES_JSON}}
@@ -30,6 +33,8 @@ JSON Schema definitions for the response:
 {{JSON_SCHEMA}}
 
 Using the schema above, decide on concrete arbitrage trades that comply with the risk limits from your additional instructions.`;
+
+const MAX_PLAN_ATTEMPTS = 3;
 
 interface RawContext {
   portfolio: Awaited<ReturnType<typeof buildPortfolioSnapshot>>;
@@ -47,6 +52,7 @@ interface RawContext {
 
 interface ExecutionContext {
   baseCurrency: string;
+  cashBalance: number;
   portfolioJson: string;
   quotesJson: string;
   historiesJson: string;
@@ -147,39 +153,52 @@ export async function runLlmPlan(options: LlmRunOptions): Promise<LlmRunResult> 
     response_format: { type: "json_object" }
   } as const;
 
-  const { content, rawResponse } = await callProvider(provider, llmPayload);
-  const plan = parseArbitragePlan(content);
-  const trades = await buildTradesFromPlan(plan, context);
+  for (let attempt = 1; attempt <= MAX_PLAN_ATTEMPTS; attempt++) {
+    try {
+      const { content, rawResponse } = await callProvider(provider, llmPayload);
+      const plan = parseArbitragePlan(content);
+      const trades = await buildTradesFromPlan(plan, context);
 
-  const baseResult: Omit<LlmRunResult, "executed" | "snapshot"> & { executed: false } = {
-    plan,
-    rawResponse,
-    assistantMessage: content,
-    trades,
-    executed: false,
-    systemPrompt,
-    userPrompt,
-    messages,
-    context
-  };
+      const baseResult: Omit<LlmRunResult, "executed" | "snapshot"> & { executed: false } = {
+        plan,
+        rawResponse,
+        assistantMessage: content,
+        trades,
+        executed: false,
+        systemPrompt,
+        userPrompt,
+        messages,
+        context
+      };
 
-  if (dryRun || trades.length === 0) {
-    return baseResult;
+      if (dryRun || trades.length === 0) {
+        return baseResult;
+      }
+
+      try {
+        await executeTradeInputs(trades, portfolioId);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to execute trades";
+        throw new LlmPlanExecutionError(message, baseResult, { cause: error });
+      }
+      const snapshot = await buildPortfolioSnapshot(portfolioId);
+
+      return {
+        ...baseResult,
+        executed: true,
+        snapshot,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (attempt >= MAX_PLAN_ATTEMPTS) {
+        console.error(`LLM plan attempt ${attempt} failed: ${message}. No further retries.`);
+        throw error;
+      }
+      console.warn(`LLM plan attempt ${attempt} failed: ${message}. Retrying (${attempt + 1}/${MAX_PLAN_ATTEMPTS})...`);
+    }
   }
 
-  try {
-    await executeTradeInputs(trades, portfolioId);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to execute trades";
-    throw new LlmPlanExecutionError(message, baseResult, { cause: error });
-  }
-  const snapshot = await buildPortfolioSnapshot(portfolioId);
-
-  return {
-    ...baseResult,
-    executed: true,
-    snapshot,
-  };
+  throw new Error("LLM plan failed after maximum retry attempts");
 }
 
 function buildSystemPrompt(additional?: string | null) {
@@ -191,6 +210,9 @@ function buildSystemPrompt(additional?: string | null) {
 }
 
 function renderTemplate(template: string, context: ExecutionContext) {
+  const cashBalanceString = Number.isFinite(context.cashBalance)
+    ? context.cashBalance.toFixed(2)
+    : String(context.cashBalance);
   return template
     .replaceAll("{{PORTFOLIO_JSON}}", context.portfolioJson)
     .replaceAll("{{QUOTES_JSON}}", context.quotesJson)
@@ -198,7 +220,8 @@ function renderTemplate(template: string, context: ExecutionContext) {
     .replaceAll("{{RECENT_TRADES_JSON}}", context.tradesJson)
     .replaceAll("{{JSON_SCHEMA}}", context.schemaJson)
     .replaceAll("{{CURRENT_DATETIME}}", new Date().toISOString())
-    .replaceAll("{{BASE_CURRENCY}}", context.baseCurrency);
+    .replaceAll("{{BASE_CURRENCY}}", context.baseCurrency)
+    .replaceAll("{{CASH_BALANCE}}", cashBalanceString);
 }
 
 async function buildExecutionContext(portfolioId: number): Promise<ExecutionContext> {
@@ -246,6 +269,7 @@ async function buildExecutionContext(portfolioId: number): Promise<ExecutionCont
 
   return {
     baseCurrency: snapshot.baseCurrency,
+    cashBalance: snapshot.cashBalance,
     portfolioJson: JSON.stringify(raw.portfolio, null, 2),
     quotesJson: JSON.stringify(raw.quotes, null, 2),
     historiesJson: JSON.stringify(raw.histories, null, 2),
