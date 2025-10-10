@@ -22,7 +22,7 @@ export async function getQuote(symbol: string): Promise<QuoteResponse> {
   }
 
   try {
-    const quote = await (yahooFinance as any).quote(normalized, { formatted: false });
+    const quote = await yahooFinance.quote(normalized, { formatted: false });
     const payload: QuoteResponse = {
       symbol: quote.symbol ?? normalized,
       price: typeof quote.regularMarketPrice === "number" ? quote.regularMarketPrice : null,
@@ -79,20 +79,35 @@ export async function getHistory(symbol: string, range: string, interval: string
   }
 
   try {
-    const chart = await (yahooFinance as any).chart(symbol, {
+    const chart = await yahooFinance.chart(symbol, {
       range: normalizedRange,
       interval,
       return: "object"
     });
     const quotes = chart.quotes ?? [];
-    const candles: HistoryCandle[] = quotes.map((point: any) => ({
-      date: point.date ? point.date.toISOString() : new Date(point.timestamp * 1000).toISOString(),
-      open: sanitizePoint(point.open),
-      high: sanitizePoint(point.high),
-      low: sanitizePoint(point.low),
-      close: sanitizePoint(point.close),
-      volume: typeof point.volume === "number" ? point.volume : null
-    }));
+    const candles: HistoryCandle[] = quotes
+      .map((point) => {
+        const isoDate =
+          point.date instanceof Date
+            ? point.date.toISOString()
+            : typeof point.timestamp === "number"
+              ? new Date(point.timestamp * 1000).toISOString()
+              : null;
+
+        if (!isoDate) {
+          return null;
+        }
+
+        return {
+          date: isoDate,
+          open: sanitizePoint(point.open),
+          high: sanitizePoint(point.high),
+          low: sanitizePoint(point.low),
+          close: sanitizePoint(point.close),
+          volume: typeof point.volume === "number" ? point.volume : null
+        } satisfies HistoryCandle;
+      })
+      .filter((entry): entry is HistoryCandle => entry !== null);
 
     historyCache.set(key, candles);
     return candles;

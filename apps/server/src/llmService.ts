@@ -35,6 +35,8 @@ JSON Schema definitions for the response:
 Using the schema above, decide on concrete arbitrage trades that comply with the risk limits from your additional instructions.`;
 
 const MAX_PLAN_ATTEMPTS = 3;
+const FEE_SLIPPAGE_RATE = 0.001; // 0.10%
+const CASH_TOLERANCE = 0.01; // allow minor rounding differences
 
 interface RawContext {
   portfolio: Awaited<ReturnType<typeof buildPortfolioSnapshot>>;
@@ -145,17 +147,19 @@ export async function runLlmPlan(options: LlmRunOptions): Promise<LlmRunResult> 
     { role: "user", content: userPrompt }
   ];
 
-  const llmPayload = {
-    model: overrides?.model ?? provider.model,
-    temperature: overrides?.temperature ?? provider.temperature ?? 0,
-    max_tokens: overrides?.maxTokens ?? provider.maxTokens ?? undefined,
-    messages,
-    response_format: { type: "json_object" }
-  } as const;
-
   for (let attempt = 1; attempt <= MAX_PLAN_ATTEMPTS; attempt++) {
     try {
-      const { content, rawResponse } = await callProvider(provider, llmPayload);
+      const payload = {
+        model: overrides?.model ?? provider.model,
+        temperature: overrides?.temperature ?? provider.temperature ?? 0,
+        max_tokens: overrides?.maxTokens ?? provider.maxTokens ?? undefined,
+        messages,
+        response_format: { type: "json_object" }
+      } as const;
+
+      const { content, rawResponse } = await callProvider(provider, payload);
+      messages.push({ role: "assistant", content });
+
       const plan = parseArbitragePlan(content);
       const trades = await buildTradesFromPlan(plan, context);
 
@@ -170,6 +174,8 @@ export async function runLlmPlan(options: LlmRunOptions): Promise<LlmRunResult> 
         messages,
         context
       };
+
+      enforceCashDiscipline(trades, context, baseResult);
 
       if (dryRun || trades.length === 0) {
         return baseResult;
@@ -195,10 +201,84 @@ export async function runLlmPlan(options: LlmRunOptions): Promise<LlmRunResult> 
         throw error;
       }
       console.warn(`LLM plan attempt ${attempt} failed: ${message}. Retrying (${attempt + 1}/${MAX_PLAN_ATTEMPTS})...`);
+
+      const retryInstruction = buildRetryInstruction(error, context);
+      if (retryInstruction) {
+        messages.push({ role: "user", content: retryInstruction });
+      }
+
+      continue;
     }
   }
 
   throw new Error("LLM plan failed after maximum retry attempts");
+}
+
+function enforceCashDiscipline(
+  trades: TradeInput[],
+  context: ExecutionContext,
+  baseResult: Omit<LlmRunResult, "executed" | "snapshot"> & { executed: false }
+) {
+  let availableCash = context.cashBalance;
+  let totalBuyNotional = 0;
+
+  for (const trade of trades) {
+    const notional = trade.price * trade.qty;
+
+    if (trade.side === "BUY") {
+      totalBuyNotional += notional;
+      const requiredCash = notional * (1 + FEE_SLIPPAGE_RATE);
+      if (requiredCash - availableCash > CASH_TOLERANCE) {
+        const message =
+          `Buy order for ${trade.symbol} needs ${formatCurrency(requiredCash, context.baseCurrency)} (incl. 0.10% fees), ` +
+          `but only ${formatCurrency(availableCash, context.baseCurrency)} is available. ` +
+          `Reduce the quantity or skip this trade so the full plan fits within the cash balance.`;
+        throw new LlmPlanExecutionError(message, baseResult);
+      }
+      availableCash -= notional;
+    } else if (trade.side === "SELL") {
+      availableCash += notional;
+    }
+  }
+
+  if (totalBuyNotional === 0) {
+    return;
+  }
+
+  const totalWithFees = totalBuyNotional * (1 + FEE_SLIPPAGE_RATE);
+  if (totalWithFees - context.cashBalance > CASH_TOLERANCE) {
+    const message =
+      `Aggregate BUY exposure of ${formatCurrency(totalWithFees, context.baseCurrency)} (incl. fees) exceeds ` +
+      `the starting cash balance of ${formatCurrency(context.cashBalance, context.baseCurrency)}. ` +
+      `Distribute funds across fewer symbols or downsize orders to stay within budget.`;
+    throw new LlmPlanExecutionError(message, baseResult);
+  }
+}
+
+function buildRetryInstruction(error: unknown, context: ExecutionContext): string | null {
+  if (error instanceof LlmPlanExecutionError) {
+    return (
+      `Previous plan could not be executed: ${error.message}\n\n` +
+      `Return a corrected JSON plan that strictly respects the schema and keeps all BUY orders within ` +
+      `${formatCurrency(context.cashBalance, context.baseCurrency)} of available cash (including 0.10% fees).`
+    );
+  }
+
+  if (error instanceof Error) {
+    return (
+      `The prior response failed (${error.message}). Please generate a new JSON plan that validates against the provided schema ` +
+      `and keeps BUY orders within ${formatCurrency(context.cashBalance, context.baseCurrency)}.`
+    );
+  }
+
+  return (
+    `The previous attempt did not succeed. Provide a new JSON plan that respects the schema and stays within ` +
+    `${formatCurrency(context.cashBalance, context.baseCurrency)} of available cash.`
+  );
+}
+
+function formatCurrency(amount: number, currency: string) {
+  return `${currency} ${amount.toFixed(2)}`;
 }
 
 function buildSystemPrompt(additional?: string | null) {
