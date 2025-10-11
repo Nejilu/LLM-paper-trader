@@ -171,12 +171,16 @@ export function registerLlmRoutes(app: Application) {
       await getPortfolioRecord(portfolioId);
 
       const prompts = await prisma.portfolioPrompt.findMany({
-        where: { portfolioId },
         orderBy: { createdAt: "asc" },
         include: { provider: true }
       });
 
-      res.json({ prompts: prompts.map((prompt) => mapPrompt(prompt)) });
+      const owned = prompts.filter((prompt) => prompt.portfolioId === portfolioId);
+      const shared = prompts.filter((prompt) => prompt.portfolioId !== portfolioId);
+
+      res.json({
+        prompts: [...owned, ...shared].map((prompt) => mapPrompt(prompt))
+      });
     } catch (error) {
       console.error("List prompts failed", error);
       res.status(400).json({ error: error instanceof Error ? error.message : "Unable to fetch prompts" });
@@ -329,8 +333,8 @@ export function registerLlmRoutes(app: Application) {
       const body = llmRunSchema.parse(req.body ?? {});
 
       const prompt = body.promptId
-        ? await prisma.portfolioPrompt.findFirst({
-            where: { id: body.promptId, portfolioId },
+        ? await prisma.portfolioPrompt.findUnique({
+            where: { id: body.promptId },
             include: { provider: true }
           })
         : await prisma.portfolioPrompt.findFirst({
