@@ -256,6 +256,24 @@ export interface PortfolioPrompt {
   provider: LlmProvider | null;
 }
 
+export type RunFrequency = "daily" | "weekly" | "monthly";
+
+export interface LlmRunSchedule {
+  id: number;
+  portfolioId: number;
+  promptId: number | null;
+  providerId: number | null;
+  frequency: RunFrequency;
+  timeOfDay: string;
+  dayOfWeek: number | null;
+  dayOfMonth: number | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  provider: LlmProvider | null;
+  prompt: PortfolioPrompt | null;
+}
+
 export interface ArbitrageOrder {
   symbol: string;
   action: "BUY" | "SELL";
@@ -349,6 +367,14 @@ interface ExecutionsResponse {
   executions: LlmExecutionDto[];
 }
 
+interface RunSchedulesResponse {
+  schedules: LlmRunSchedule[];
+}
+
+interface RunScheduleResponse {
+  schedule: LlmRunSchedule;
+}
+
 export type LlmProviderType =
   | "openai-compatible"
   | "local"
@@ -389,6 +415,18 @@ type UpdatePromptInput = Omit<
   systemPrompt?: string | null;
   userTemplate?: string | null;
 };
+
+interface CreateRunScheduleInput {
+  promptId?: number | null;
+  providerId?: number | null;
+  frequency: RunFrequency;
+  timeOfDay: string;
+  dayOfWeek?: number;
+  dayOfMonth?: number;
+  isActive?: boolean;
+}
+
+type UpdateRunScheduleInput = Partial<CreateRunScheduleInput>;
 
 export function useLlmProviders() {
   return useQuery({
@@ -486,6 +524,57 @@ export function useDeletePortfolioPrompt(portfolioId?: number) {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["portfolio-prompts", portfolioId] });
+    }
+  });
+}
+
+export function usePortfolioRunSchedules(portfolioId?: number) {
+  return useQuery({
+    queryKey: ["run-schedules", portfolioId],
+    enabled: Boolean(portfolioId),
+    queryFn: () =>
+      apiFetch<RunSchedulesResponse>(`/api/portfolios/${portfolioId}/run-schedules`),
+    staleTime: 30_000
+  });
+}
+
+export function useCreateRunSchedule(portfolioId?: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: CreateRunScheduleInput) =>
+      apiFetch<RunScheduleResponse>(`/api/portfolios/${portfolioId}/run-schedules`, {
+        method: "POST",
+        body: JSON.stringify(payload)
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["run-schedules", portfolioId] });
+    }
+  });
+}
+
+export function useUpdateRunSchedule(portfolioId?: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: UpdateRunScheduleInput }) =>
+      apiFetch<RunScheduleResponse>(`/api/portfolios/${portfolioId}/run-schedules/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(payload)
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["run-schedules", portfolioId] });
+    }
+  });
+}
+
+export function useDeleteRunSchedule(portfolioId?: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (scheduleId: number) =>
+      apiFetch<{ success: boolean }>(`/api/portfolios/${portfolioId}/run-schedules/${scheduleId}`, {
+        method: "DELETE"
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["run-schedules", portfolioId] });
     }
   });
 }
