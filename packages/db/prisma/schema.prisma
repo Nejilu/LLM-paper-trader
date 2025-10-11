@@ -16,6 +16,7 @@ model Portfolio {
   trades        Trade[]
   prompts       PortfolioPrompt[]
   llmExecutions LlmExecution[]
+  runSchedules  LlmRunSchedule[]
 }
 
 model Position {
@@ -62,6 +63,7 @@ model LlmProvider {
   updatedAt   DateTime          @updatedAt
   prompts     PortfolioPrompt[]
   executions  LlmExecution[]
+  runSchedules LlmRunSchedule[]
 
   @@index([isDefault])
 }
@@ -81,6 +83,7 @@ model PortfolioPrompt {
   portfolio    Portfolio      @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
   provider     LlmProvider?   @relation(fields: [providerId], references: [id], onDelete: SetNull)
   executions   LlmExecution[]
+  runSchedules LlmRunSchedule[]
 
   @@index([portfolioId])
   @@index([providerId])
@@ -101,6 +104,27 @@ model LlmExecution {
   portfolio      Portfolio        @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
   prompt         PortfolioPrompt? @relation(fields: [promptId], references: [id], onDelete: SetNull)
   provider       LlmProvider?     @relation(fields: [providerId], references: [id], onDelete: SetNull)
+
+  @@index([portfolioId])
+  @@index([promptId])
+  @@index([providerId])
+}
+
+model LlmRunSchedule {
+  id          Int            @id @default(autoincrement())
+  portfolioId Int
+  promptId    Int?
+  providerId  Int?
+  frequency   String
+  timeOfDay   String
+  dayOfWeek   Int?
+  dayOfMonth  Int?
+  isActive    Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  portfolio   Portfolio      @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  prompt      PortfolioPrompt? @relation(fields: [promptId], references: [id], onDelete: SetNull)
+  provider    LlmProvider?   @relation(fields: [providerId], references: [id], onDelete: SetNull)
 
   @@index([portfolioId])
   @@index([promptId])
