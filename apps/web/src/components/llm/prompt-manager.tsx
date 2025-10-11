@@ -91,6 +91,9 @@ export function PortfolioPromptManager({ portfolioId }: Props) {
   };
 
   const beginEdit = (prompt: PortfolioPrompt) => {
+    if (!portfolioId || prompt.portfolioId !== portfolioId) {
+      return;
+    }
     setEditingId(prompt.id);
     setEditingDraft({
       name: prompt.name,
@@ -132,11 +135,14 @@ export function PortfolioPromptManager({ portfolioId }: Props) {
     );
   };
 
-  const removePrompt = (promptId: number) => {
+  const removePrompt = (prompt: PortfolioPrompt) => {
+    if (!portfolioId || prompt.portfolioId !== portfolioId) {
+      return;
+    }
     if (!confirm("Delete this prompt template?")) {
       return;
     }
-    deleteMutation.mutate(promptId);
+    deleteMutation.mutate(prompt.id);
   };
 
   return (
@@ -238,10 +244,12 @@ export function PortfolioPromptManager({ portfolioId }: Props) {
         ) : (
           <ul className="space-y-3">
             {prompts.map((prompt) => {
+              const isOwnedByCurrent = portfolioId !== undefined && prompt.portfolioId === portfolioId;
               const isEditing = editingId === prompt.id && editingDraft;
+              const showEditingForm = isEditing && isOwnedByCurrent;
               return (
                 <li key={prompt.id} className="rounded-lg border border-border p-4">
-                  {isEditing && editingDraft ? (
+                  {showEditingForm && editingDraft ? (
                     <form className="space-y-3" onSubmit={handleUpdate}>
                       <div className="grid gap-3 md:grid-cols-2">
                         <div className="flex flex-col gap-1">
@@ -359,15 +367,22 @@ export function PortfolioPromptManager({ portfolioId }: Props) {
                           <p className="text-xs text-muted-foreground">
                             {prompt.description ?? "No description"}
                           </p>
+                          {!isOwnedByCurrent ? (
+                            <p className="text-xs text-muted-foreground">
+                              Shared from portfolio #{prompt.portfolioId}
+                            </p>
+                          ) : null}
                         </div>
-                        <div className="flex flex-wrap gap-2">
-                          <Button size="sm" variant="outline" onClick={() => beginEdit(prompt)}>
-                            Edit
-                          </Button>
-                          <Button size="sm" variant="destructive" onClick={() => removePrompt(prompt.id)}>
-                            Delete
-                          </Button>
-                        </div>
+                        {isOwnedByCurrent ? (
+                          <div className="flex flex-wrap gap-2">
+                            <Button size="sm" variant="outline" onClick={() => beginEdit(prompt)}>
+                              Edit
+                            </Button>
+                            <Button size="sm" variant="destructive" onClick={() => removePrompt(prompt)}>
+                              Delete
+                            </Button>
+                          </div>
+                        ) : null}
                       </div>
                       <dl className="grid gap-1 text-xs text-muted-foreground md:grid-cols-3">
                         <div>
@@ -381,6 +396,10 @@ export function PortfolioPromptManager({ portfolioId }: Props) {
                         <div>
                           <dt className="font-semibold text-foreground">Active</dt>
                           <dd>{prompt.isActive ? "Yes" : "No"}</dd>
+                        </div>
+                        <div>
+                          <dt className="font-semibold text-foreground">Created for portfolio</dt>
+                          <dd>#{prompt.portfolioId}</dd>
                         </div>
                       </dl>
                       <details className="rounded-md border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
