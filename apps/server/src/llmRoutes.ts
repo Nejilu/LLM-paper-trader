@@ -1,6 +1,11 @@
 ﻿import type { Application } from "express";
 import { prisma } from "@paper-trading/db";
-import type { LlmExecution, LlmProvider, PortfolioPrompt as PrismaPortfolioPrompt } from "@paper-trading/db";
+import type {
+  LlmExecution,
+  LlmProvider,
+  LlmRunSchedule as PrismaLlmRunSchedule,
+  PortfolioPrompt as PrismaPortfolioPrompt
+} from "@paper-trading/db";
 import { z } from "zod";
 import { LlmPlanExecutionError, runLlmPlan } from "./llmService";
 import { ARBITRAGE_JSON_SCHEMA } from "./llmSchema";
@@ -62,6 +67,38 @@ const llmRunSchema = z.object({
     .optional(),
   dryRun: z.boolean().optional()
 });
+
+const runScheduleBaseSchema = z.object({
+  promptId: z.union([z.number().int().positive(), z.null()]).optional(),
+  providerId: z.union([z.number().int().positive(), z.null()]).optional(),
+  frequency: z.enum(["daily", "weekly", "monthly"]),
+  timeOfDay: z
+    .string()
+    .regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/, "Time must be in HH:MM 24-hour format"),
+  dayOfWeek: z.number().int().min(0).max(6).optional(),
+  dayOfMonth: z.number().int().min(1).max(31).optional(),
+  isActive: z.boolean().optional()
+});
+
+const runScheduleInputSchema = runScheduleBaseSchema.superRefine((data, ctx) => {
+    if (data.frequency === "weekly" && data.dayOfWeek === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Weekly schedules require a day of the week",
+        path: ["dayOfWeek"]
+      });
+    }
+
+    if (data.frequency === "monthly" && data.dayOfMonth === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Monthly schedules require a day of the month",
+        path: ["dayOfMonth"]
+      });
+    }
+  });
+
+const runScheduleUpdateSchema = runScheduleBaseSchema.partial();
 
 export function registerLlmRoutes(app: Application) {
   app.get("/api/llm/schema", (_req, res) => {
@@ -304,6 +341,176 @@ export function registerLlmRoutes(app: Application) {
     }
   });
 
+  app.get("/api/portfolios/:id/run-schedules", async (req, res) => {
+    try {
+      const portfolioId = parsePortfolioIdStrict(req.params.id);
+      await getPortfolioRecord(portfolioId);
+
+      const schedules = await prisma.llmRunSchedule.findMany({
+        where: { portfolioId },
+        orderBy: { createdAt: "asc" },
+        include: { provider: true, prompt: { include: { provider: true } } }
+      });
+
+      res.json({ schedules: schedules.map((schedule) => mapRunSchedule(schedule)) });
+    } catch (error) {
+      console.error("List run schedules failed", error);
+      res.status(400).json({ error: error instanceof Error ? error.message : "Unable to fetch run schedules" });
+    }
+  });
+
+  app.post("/api/portfolios/:id/run-schedules", async (req, res) => {
+    try {
+      const portfolioId = parsePortfolioIdStrict(req.params.id);
+      await getPortfolioRecord(portfolioId);
+      const body = runScheduleInputSchema.parse(req.body ?? {});
+
+      if (body.promptId !== undefined && body.promptId !== null) {
+        const promptExists = await prisma.portfolioPrompt.findUnique({ where: { id: body.promptId } });
+        if (!promptExists) {
+          return res.status(404).json({ error: "Prompt not found" });
+        }
+      }
+
+      if (body.providerId !== undefined && body.providerId !== null) {
+        const providerExists = await prisma.llmProvider.findUnique({ where: { id: body.providerId } });
+        if (!providerExists) {
+          return res.status(404).json({ error: "Provider not found" });
+        }
+      }
+
+      const created = await prisma.llmRunSchedule.create({
+        data: {
+          portfolioId,
+          promptId: body.promptId ?? null,
+          providerId: body.providerId ?? null,
+          frequency: body.frequency,
+          timeOfDay: body.timeOfDay,
+          dayOfWeek: body.frequency === "weekly" ? body.dayOfWeek ?? null : null,
+          dayOfMonth: body.frequency === "monthly" ? body.dayOfMonth ?? null : null,
+          isActive: body.isActive ?? true
+        },
+        include: { provider: true, prompt: { include: { provider: true } } }
+      });
+
+      res.status(201).json({ schedule: mapRunSchedule(created) });
+    } catch (error) {
+      console.error("Create run schedule failed", error);
+      res.status(400).json({ error: error instanceof Error ? error.message : "Invalid run schedule payload" });
+    }
+  });
+
+  app.put("/api/portfolios/:id/run-schedules/:scheduleId", async (req, res) => {
+    try {
+      const portfolioId = parsePortfolioIdStrict(req.params.id);
+      await getPortfolioRecord(portfolioId);
+      const scheduleId = Number.parseInt(req.params.scheduleId, 10);
+      if (!Number.isFinite(scheduleId)) {
+        return res.status(400).json({ error: "Invalid schedule id" });
+      }
+
+      const schedule = await prisma.llmRunSchedule.findUnique({
+        where: { id: scheduleId },
+        include: { provider: true, prompt: { include: { provider: true } } }
+      });
+      if (!schedule || schedule.portfolioId !== portfolioId) {
+        return res.status(404).json({ error: "Schedule not found" });
+      }
+
+      const body = runScheduleUpdateSchema.parse(req.body ?? {});
+
+      if (body.promptId !== undefined && body.promptId !== null) {
+        const promptExists = await prisma.portfolioPrompt.findUnique({ where: { id: body.promptId } });
+        if (!promptExists) {
+          return res.status(404).json({ error: "Prompt not found" });
+        }
+      }
+
+      if (body.providerId !== undefined && body.providerId !== null) {
+        const providerExists = await prisma.llmProvider.findUnique({ where: { id: body.providerId } });
+        if (!providerExists) {
+          return res.status(404).json({ error: "Provider not found" });
+        }
+      }
+
+      const merged = {
+        promptId: body.promptId !== undefined ? body.promptId : schedule.promptId,
+        providerId: body.providerId !== undefined ? body.providerId : schedule.providerId,
+        frequency: body.frequency ?? (schedule.frequency as "daily" | "weekly" | "monthly"),
+        timeOfDay: body.timeOfDay ?? schedule.timeOfDay,
+        dayOfWeek:
+          body.dayOfWeek !== undefined
+            ? body.dayOfWeek
+            : schedule.dayOfWeek !== null
+              ? schedule.dayOfWeek
+              : undefined,
+        dayOfMonth:
+          body.dayOfMonth !== undefined
+            ? body.dayOfMonth
+            : schedule.dayOfMonth !== null
+              ? schedule.dayOfMonth
+              : undefined,
+        isActive: body.isActive ?? schedule.isActive
+      };
+
+      runScheduleInputSchema.parse(merged);
+
+      const data: Record<string, unknown> = {};
+      if (body.promptId !== undefined) data.promptId = body.promptId ?? null;
+      if (body.providerId !== undefined) data.providerId = body.providerId ?? null;
+      if (body.frequency !== undefined) data.frequency = body.frequency;
+      if (body.timeOfDay !== undefined) data.timeOfDay = body.timeOfDay;
+      if (body.dayOfWeek !== undefined || body.frequency !== undefined) {
+        const nextDayOfWeek =
+          (body.frequency ?? merged.frequency) === "weekly"
+            ? body.dayOfWeek ?? merged.dayOfWeek ?? null
+            : null;
+        data.dayOfWeek = nextDayOfWeek;
+      }
+      if (body.dayOfMonth !== undefined || body.frequency !== undefined) {
+        const nextDayOfMonth =
+          (body.frequency ?? merged.frequency) === "monthly"
+            ? body.dayOfMonth ?? merged.dayOfMonth ?? null
+            : null;
+        data.dayOfMonth = nextDayOfMonth;
+      }
+      if (body.isActive !== undefined) data.isActive = body.isActive;
+
+      const updated = await prisma.llmRunSchedule.update({
+        where: { id: scheduleId },
+        data,
+        include: { provider: true, prompt: { include: { provider: true } } }
+      });
+
+      res.json({ schedule: mapRunSchedule(updated) });
+    } catch (error) {
+      console.error("Update run schedule failed", error);
+      res.status(400).json({ error: error instanceof Error ? error.message : "Invalid run schedule update" });
+    }
+  });
+
+  app.delete("/api/portfolios/:id/run-schedules/:scheduleId", async (req, res) => {
+    try {
+      const portfolioId = parsePortfolioIdStrict(req.params.id);
+      await getPortfolioRecord(portfolioId);
+      const scheduleId = Number.parseInt(req.params.scheduleId, 10);
+      if (!Number.isFinite(scheduleId)) {
+        return res.status(400).json({ error: "Invalid schedule id" });
+      }
+
+      const schedule = await prisma.llmRunSchedule.findUnique({ where: { id: scheduleId } });
+      if (!schedule || schedule.portfolioId !== portfolioId) {
+        return res.status(404).json({ error: "Schedule not found" });
+      }
+
+      await prisma.llmRunSchedule.delete({ where: { id: scheduleId } });
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Delete run schedule failed", error);
+      res.status(400).json({ error: error instanceof Error ? error.message : "Unable to delete run schedule" });
+    }
+  });
+
   app.get("/api/portfolios/:id/llm/executions", async (req, res) => {
     try {
       const portfolioId = parsePortfolioIdStrict(req.params.id);
@@ -502,6 +709,29 @@ function mapExecution(execution: LlmExecution & {
     createdAt: execution.createdAt.toISOString(),
     provider: execution.provider ? mapProvider(execution.provider) : null,
     prompt: execution.prompt ? mapPrompt(execution.prompt) : null
+  };
+}
+
+function mapRunSchedule(
+  schedule: PrismaLlmRunSchedule & {
+    provider?: LlmProvider | null;
+    prompt?: (PrismaPortfolioPrompt & { provider?: LlmProvider | null }) | null;
+  }
+) {
+  return {
+    id: schedule.id,
+    portfolioId: schedule.portfolioId,
+    promptId: schedule.promptId,
+    providerId: schedule.providerId,
+    frequency: schedule.frequency,
+    timeOfDay: schedule.timeOfDay,
+    dayOfWeek: schedule.dayOfWeek,
+    dayOfMonth: schedule.dayOfMonth,
+    isActive: schedule.isActive,
+    createdAt: schedule.createdAt.toISOString(),
+    updatedAt: schedule.updatedAt.toISOString(),
+    provider: schedule.provider ? mapProvider(schedule.provider) : null,
+    prompt: schedule.prompt ? mapPrompt(schedule.prompt) : null
   };
 }
 

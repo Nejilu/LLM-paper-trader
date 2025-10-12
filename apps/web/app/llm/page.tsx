@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { LlmAutomationPanel } from "@/components/llm/run-automation-panel";
 import { LlmExecutionHistory } from "@/components/llm/execution-history";
 import { LlmProviderManager } from "@/components/llm/provider-manager";
 import { PortfolioPromptManager } from "@/components/llm/prompt-manager";
@@ -60,6 +61,7 @@ export default function LlmConsolePage() {
           <PortfolioPromptManager portfolioId={selectedPortfolioId} />
         </div>
         <div className="flex flex-col gap-6">
+          <LlmAutomationPanel portfolioId={selectedPortfolioId} />
           <LlmRunnerPanel portfolioId={selectedPortfolioId} />
           <LlmExecutionHistory portfolioId={selectedPortfolioId} />
         </div>
