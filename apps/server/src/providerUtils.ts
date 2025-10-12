@@ -1,7 +1,38 @@
-export function buildChatCompletionsUrl(apiBase: string): string {
-  const trimmed = apiBase.trim();
-  const withoutTrailingSlashes = trimmed.replace(/\/+$/, "");
-  const withoutVersion = withoutTrailingSlashes.replace(/\/v1$/, "");
+function normalizeBase(apiBase: string) {
+  return apiBase.trim().replace(/\/+$/, "");
+}
 
-  return `${withoutVersion}/v1/chat/completions`;
+function endsWithVersionSegment(value: string) {
+  return /\/v\d[^/]*$/i.test(value);
+}
+
+function endsWithChatCompletions(value: string) {
+  return /\/chat\/completions$/i.test(value);
+}
+
+export function buildChatCompletionsUrl(apiBase: string): string {
+  const normalized = normalizeBase(apiBase);
+
+  if (endsWithChatCompletions(normalized)) {
+    return normalized;
+  }
+
+  if (endsWithVersionSegment(normalized)) {
+    return `${normalized}/chat/completions`;
+  }
+
+  return `${normalized}/v1/chat/completions`;
+}
+
+export function buildChatCompletionsUrlWithoutVersion(apiBase: string): string {
+  const normalized = normalizeBase(apiBase);
+
+  if (endsWithChatCompletions(normalized)) {
+    return normalized;
+  }
+
+  const withoutVersion = normalized.replace(/\/v\d[^/]*$/i, "");
+  const base = withoutVersion === "" ? normalized : normalizeBase(withoutVersion);
+
+  return `${base}/chat/completions`;
 }

@@ -1,7 +1,10 @@
 import { prisma } from "@paper-trading/db";
 import type { HistoryCandle } from "./types";
 import { TradeInput } from "./portfolio";
-import { buildChatCompletionsUrl } from "./providerUtils";
+import {
+  buildChatCompletionsUrl,
+  buildChatCompletionsUrlWithoutVersion
+} from "./providerUtils";
 import {
   buildPortfolioSnapshot,
   deriveMarketPrice,
@@ -386,7 +389,8 @@ async function callOpenAiCompatibleProvider(
   provider: LlmRunOptions["provider"],
   payload: Parameters<typeof callProvider>[1]
 ) {
-  const requestUrl = buildChatCompletionsUrl(provider.apiBase);
+  const primaryUrl = buildChatCompletionsUrl(provider.apiBase);
+  const fallbackUrl = buildChatCompletionsUrlWithoutVersion(provider.apiBase);
   const baseBody: Record<string, unknown> = {
     model: payload.model,
     messages: payload.messages,
@@ -406,20 +410,34 @@ async function callOpenAiCompatibleProvider(
     headers.Authorization = `Bearer ${provider.apiKey}`;
   }
 
-  let response = await fetch(requestUrl, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(baseBody)
-  });
-
-  if (!response.ok && payload.response_format) {
-    const fallbackBody = { ...baseBody };
-    delete fallbackBody.response_format;
-    response = await fetch(requestUrl, {
+  const sendRequest = async (url: string) => {
+    let response = await fetch(url, {
       method: "POST",
       headers,
-      body: JSON.stringify(fallbackBody)
+      body: JSON.stringify(baseBody)
     });
+
+    if (!response.ok && payload.response_format) {
+      const bodyWithoutResponseFormat = { ...baseBody };
+      delete bodyWithoutResponseFormat.response_format;
+      response = await fetch(url, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(bodyWithoutResponseFormat)
+      });
+    }
+
+    return response;
+  };
+
+  let response = await sendRequest(primaryUrl);
+
+  if (
+    !response.ok &&
+    response.status === 404 &&
+    fallbackUrl !== primaryUrl
+  ) {
+    response = await sendRequest(fallbackUrl);
   }
 
   if (!response.ok) {
