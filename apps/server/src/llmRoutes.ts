@@ -603,7 +603,8 @@ export function registerLlmRoutes(app: Application) {
           messages: result.messages,
           systemPrompt: result.systemPrompt,
           userPrompt: result.userPrompt,
-          assistantMessage: result.assistantMessage
+          assistantMessage: result.assistantMessage,
+          groundingMetadata: result.groundingMetadata ?? null
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : "LLM run failed";
@@ -626,7 +627,14 @@ export function registerLlmRoutes(app: Application) {
         });
         console.error("LLM run failed", error);
         if (error instanceof LlmPlanExecutionError) {
-          res.status(400).json({ error: message, plan: error.result.plan, trades: error.result.trades });
+          res
+            .status(400)
+            .json({
+              error: message,
+              plan: error.result.plan,
+              trades: error.result.trades,
+              groundingMetadata: error.result.groundingMetadata ?? null
+            });
         } else {
           res.status(400).json({ error: message });
         }
