@@ -126,7 +126,8 @@ describe("callProvider", () => {
     });
     const body = JSON.parse((init?.body as string) ?? "{}") as Record<string, unknown>;
     expect(body).toMatchObject({
-      generationConfig: { temperature: 0.4, maxOutputTokens: 500 }
+      generationConfig: { temperature: 0.4, maxOutputTokens: 500 },
+      tools: [{ google_search: {} }]
     });
     expect(body).toHaveProperty("systemInstruction");
     expect(body).toHaveProperty("contents");
