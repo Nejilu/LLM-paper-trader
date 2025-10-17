@@ -133,6 +133,76 @@ describe("callProvider", () => {
     expect(body).toHaveProperty("contents");
   });
 
+  it("exposes Gemini grounding metadata when available", async () => {
+    const groundingMetadata = {
+      webSearchQueries: ["paper trading"],
+      groundingChunks: [
+        {
+          id: "chunk-1",
+          chunkContent: { text: "Chunk text" },
+          web: { uri: "https://example.com", title: "Example" }
+        }
+      ],
+      groundingSupports: [
+        {
+          groundingChunkIndices: [0],
+          confidenceScores: [
+            {
+              probability: 0.42,
+              type: "GROUNDING_SUPPORT_SCORE"
+            }
+          ]
+        }
+      ],
+      searchEntryPoint: { renderedContent: "<p>Example</p>" }
+    };
+
+    const fetchSpy = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        candidates: [
+          {
+            content: {
+              parts: [{ text: "{\"trades\":[]}" }]
+            },
+            groundingMetadata
+          }
+        ]
+      }),
+      text: async () => ""
+    });
+    globalThis.fetch = fetchSpy as unknown as typeof globalThis.fetch;
+
+    const result = await callProvider(
+      {
+        id: 2,
+        name: "Gemini",
+        type: "google-gemini",
+        apiBase: "https://generativelanguage.googleapis.com/v1beta",
+        apiKey: "gemini-key",
+        model: "gemini-pro",
+        temperature: null,
+        maxTokens: null
+      },
+      {
+        model: "gemini-pro",
+        temperature: 0.4,
+        max_tokens: 500,
+        messages: [
+          { role: "system", content: "system" },
+          { role: "user", content: "hello" }
+        ]
+      }
+    );
+
+    expect(result.groundingMetadata).toEqual({
+      webSearchQueries: ["paper trading"],
+      groundingChunks: [groundingMetadata.groundingChunks[0]],
+      groundingSupports: [groundingMetadata.groundingSupports[0]],
+      searchEntryPoint: groundingMetadata.searchEntryPoint
+    });
+  });
+
   it("builds an Anthropic request with system prompt and headers", async () => {
     const fetchSpy = vi.fn().mockResolvedValue({
       ok: true,
