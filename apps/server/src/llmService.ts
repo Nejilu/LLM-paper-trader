@@ -456,7 +456,8 @@ async function callGeminiProvider(
   }
 
   const body: Record<string, unknown> = {
-    contents
+    contents,
+    tools: [{ google_search: {} }]
   };
   if (systemInstruction) {
     body.systemInstruction = systemInstruction;
