@@ -106,12 +106,26 @@ export interface LlmRunOptions {
   dryRun?: boolean;
 }
 
+export interface GeminiGroundingMetadata {
+  webSearchQueries: string[];
+  groundingChunks: Array<Record<string, unknown>>;
+  groundingSupports: Array<Record<string, unknown>>;
+  searchEntryPoint: Record<string, unknown> | null;
+}
+
+export interface ProviderCallResult {
+  content: string;
+  rawResponse: string;
+  groundingMetadata?: GeminiGroundingMetadata;
+}
+
 export interface LlmRunResult {
   plan: ArbitragePlan;
   rawResponse: string;
   assistantMessage: string;
   trades: TradeInput[];
   executed: boolean;
+  groundingMetadata?: GeminiGroundingMetadata;
   snapshot?: Awaited<ReturnType<typeof buildPortfolioSnapshot>>;
   systemPrompt: string;
   userPrompt: string;
@@ -157,7 +171,7 @@ export async function runLlmPlan(options: LlmRunOptions): Promise<LlmRunResult> 
         response_format: { type: "json_object" }
       } as const;
 
-      const { content, rawResponse } = await callProvider(provider, payload);
+      const { content, rawResponse, groundingMetadata } = await callProvider(provider, payload);
       messages.push({ role: "assistant", content });
 
       const plan = parseArbitragePlan(content);
@@ -172,7 +186,8 @@ export async function runLlmPlan(options: LlmRunOptions): Promise<LlmRunResult> 
         systemPrompt,
         userPrompt,
         messages,
-        context
+        context,
+        groundingMetadata
       };
 
       enforceCashDiscipline(trades, context, baseResult);
@@ -368,7 +383,7 @@ export async function callProvider(
     messages: ChatMessage[];
     response_format?: { type: string };
   }
-) {
+) : Promise<ProviderCallResult> {
   switch (provider.type) {
     case "google-gemini":
       return callGeminiProvider(provider, payload);
@@ -385,7 +400,7 @@ export async function callProvider(
 async function callOpenAiCompatibleProvider(
   provider: LlmRunOptions["provider"],
   payload: Parameters<typeof callProvider>[1]
-) {
+) : Promise<ProviderCallResult> {
   const requestUrl = buildChatCompletionsUrl(provider.apiBase);
   const baseBody: Record<string, unknown> = {
     model: payload.model,
@@ -443,7 +458,7 @@ async function callOpenAiCompatibleProvider(
 async function callGeminiProvider(
   provider: LlmRunOptions["provider"],
   payload: Parameters<typeof callProvider>[1]
-) {
+) : Promise<ProviderCallResult> {
   const requestUrl = buildGeminiUrl(provider.apiBase, payload.model);
   const { systemInstruction, contents } = splitMessagesForGemini(payload.messages);
 
@@ -453,6 +468,9 @@ async function callGeminiProvider(
   }
   if (payload.max_tokens) {
     generationConfig.maxOutputTokens = payload.max_tokens;
+  }
+  if (payload.response_format?.type === "json_object") {
+    generationConfig.responseMimeType = "application/json";
   }
 
   const body: Record<string, unknown> = {
@@ -484,10 +502,7 @@ async function callGeminiProvider(
     throw new Error(`LLM provider request failed (${response.status}): ${text}`);
   }
 
-  const data = (await response.json()) as {
-    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-    error?: { message?: string };
-  };
+  const data = (await response.json()) as GeminiGenerateContentResponse;
   if (data.error?.message) {
     throw new Error(`LLM provider error: ${data.error.message}`);
   }
@@ -498,13 +513,75 @@ async function callGeminiProvider(
     throw new Error("LLM provider returned no content");
   }
 
-  return { content, rawResponse: JSON.stringify(data) };
+  const groundingMetadata = normalizeGeminiGroundingMetadata(data.candidates?.[0]?.groundingMetadata);
+
+  return { content, rawResponse: JSON.stringify(data), groundingMetadata };
+}
+
+interface GeminiGenerateContentResponse {
+  candidates?: Array<{
+    content?: { parts?: Array<{ text?: string }> };
+    groundingMetadata?: GeminiGroundingMetadataResponse;
+  }>;
+  error?: { message?: string };
+}
+
+interface GeminiGroundingMetadataResponse {
+  webSearchQueries?: unknown;
+  groundingChunks?: unknown;
+  groundingSupports?: unknown;
+  searchEntryPoint?: unknown;
+}
+
+function normalizeGeminiGroundingMetadata(
+  metadata?: GeminiGroundingMetadataResponse
+): GeminiGroundingMetadata | undefined {
+  if (!metadata) {
+    return undefined;
+  }
+
+  const webSearchQueries = Array.isArray(metadata.webSearchQueries)
+    ? metadata.webSearchQueries.filter((query): query is string => typeof query === "string")
+    : [];
+
+  const groundingChunks = Array.isArray(metadata.groundingChunks)
+    ? metadata.groundingChunks
+        .filter((chunk): chunk is Record<string, unknown> => !!chunk && typeof chunk === "object")
+        .map((chunk) => chunk)
+    : [];
+
+  const groundingSupports = Array.isArray(metadata.groundingSupports)
+    ? metadata.groundingSupports
+        .filter((support): support is Record<string, unknown> => !!support && typeof support === "object")
+        .map((support) => support)
+    : [];
+
+  const searchEntryPoint =
+    metadata.searchEntryPoint && typeof metadata.searchEntryPoint === "object"
+      ? (metadata.searchEntryPoint as Record<string, unknown>)
+      : null;
+
+  if (
+    webSearchQueries.length === 0 &&
+    groundingChunks.length === 0 &&
+    groundingSupports.length === 0 &&
+    !searchEntryPoint
+  ) {
+    return undefined;
+  }
+
+  return {
+    webSearchQueries,
+    groundingChunks,
+    groundingSupports,
+    searchEntryPoint
+  };
 }
 
 async function callAnthropicProvider(
   provider: LlmRunOptions["provider"],
   payload: Parameters<typeof callProvider>[1]
-) {
+) : Promise<ProviderCallResult> {
   const requestUrl = buildAnthropicUrl(provider.apiBase);
   const { system, messages } = splitMessagesForAnthropic(payload.messages);
 

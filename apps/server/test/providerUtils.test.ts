@@ -126,11 +126,128 @@ describe("callProvider", () => {
     });
     const body = JSON.parse((init?.body as string) ?? "{}") as Record<string, unknown>;
     expect(body).toMatchObject({
-      generationConfig: { temperature: 0.4, maxOutputTokens: 500 },
-      tools: [{ google_search: {} }]
+      generationConfig: { temperature: 0.4, maxOutputTokens: 500 }
     });
+    expect(body).toHaveProperty("tools", [{ google_search: {} }]);
     expect(body).toHaveProperty("systemInstruction");
     expect(body).toHaveProperty("contents");
+  });
+
+  it("requests JSON mime type when response_format specifies a json object", async () => {
+    const fetchSpy = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        candidates: [
+          {
+            content: {
+              parts: [{ text: "{\"trades\":[]}" }]
+            }
+          }
+        ]
+      }),
+      text: async () => ""
+    });
+    globalThis.fetch = fetchSpy as unknown as typeof globalThis.fetch;
+
+    await callProvider(
+      {
+        id: 2,
+        name: "Gemini",
+        type: "google-gemini",
+        apiBase: "https://generativelanguage.googleapis.com/v1beta",
+        apiKey: "gemini-key",
+        model: "gemini-pro",
+        temperature: null,
+        maxTokens: null
+      },
+      {
+        model: "gemini-pro",
+        temperature: 0.2,
+        max_tokens: 250,
+        messages: [
+          { role: "system", content: "system" },
+          { role: "user", content: "hello" }
+        ],
+        response_format: { type: "json_object" }
+      }
+    );
+
+    const [, init] = fetchSpy.mock.calls[0] ?? [];
+    const body = JSON.parse((init?.body as string) ?? "{}") as Record<string, unknown>;
+    expect(body).toMatchObject({
+      generationConfig: { responseMimeType: "application/json", temperature: 0.2, maxOutputTokens: 250 }
+    });
+    expect(body).toHaveProperty("tools", [{ google_search: {} }]);
+  });
+
+  it("exposes Gemini grounding metadata when available", async () => {
+    const groundingMetadata = {
+      webSearchQueries: ["paper trading"],
+      groundingChunks: [
+        {
+          id: "chunk-1",
+          chunkContent: { text: "Chunk text" },
+          web: { uri: "https://example.com", title: "Example" }
+        }
+      ],
+      groundingSupports: [
+        {
+          groundingChunkIndices: [0],
+          confidenceScores: [
+            {
+              probability: 0.42,
+              type: "GROUNDING_SUPPORT_SCORE"
+            }
+          ]
+        }
+      ],
+      searchEntryPoint: { renderedContent: "<p>Example</p>" }
+    };
+
+    const fetchSpy = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        candidates: [
+          {
+            content: {
+              parts: [{ text: "{\"trades\":[]}" }]
+            },
+            groundingMetadata
+          }
+        ]
+      }),
+      text: async () => ""
+    });
+    globalThis.fetch = fetchSpy as unknown as typeof globalThis.fetch;
+
+    const result = await callProvider(
+      {
+        id: 2,
+        name: "Gemini",
+        type: "google-gemini",
+        apiBase: "https://generativelanguage.googleapis.com/v1beta",
+        apiKey: "gemini-key",
+        model: "gemini-pro",
+        temperature: null,
+        maxTokens: null
+      },
+      {
+        model: "gemini-pro",
+        temperature: 0.4,
+        max_tokens: 500,
+        messages: [
+          { role: "system", content: "system" },
+          { role: "user", content: "hello" }
+        ]
+      }
+    );
+
+    expect(result.groundingMetadata).toEqual({
+      webSearchQueries: ["paper trading"],
+      groundingChunks: [groundingMetadata.groundingChunks[0]],
+      groundingSupports: [groundingMetadata.groundingSupports[0]],
+      searchEntryPoint: groundingMetadata.searchEntryPoint
+    });
   });
 
   it("builds an Anthropic request with system prompt and headers", async () => {
