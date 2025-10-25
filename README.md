@@ -1,6 +1,6 @@
 # LLM paper trader
 
-Monorepo for a local-first paper trading desk covering global equities, ETFs/ETNs, and indices. The project wires a Next.js dashboard to an Express API backed by Prisma + SQLite with live data from Yahoo Finance (unofficial) and OpenFIGI for universal symbol search.
+Monorepo for a local-first paper trading desk covering global equities, ETFs/ETNs, and indices. The project wires a Next.js dashboard to an Express API backed by Prisma + PostgreSQL (Neon-friendly) with live data from Yahoo Finance (unofficial) and OpenFIGI for universal symbol search.
 
 > **Legal notice**: Yahoo Finance data is unofficial and provided strictly for personal and educational use. Always validate prices with your broker before acting.
 
@@ -10,20 +10,20 @@ Monorepo for a local-first paper trading desk covering global equities, ETFs/ETN
 - **Strict JSON output**: the LLM is forced to return an **arbitrage JSON** that is validated against a **JSON Schema** before any action.
 - **End-to-end runner** (Express): assembles context (positions, cash, history, quotes), calls the configured provider, validates the JSON, and **executes paper trades**.
 - **Providers & keys**: supports **OpenAI-compatible** endpoints (OpenAI, Perplexity API, Anyscale, vLLM proxy) and **local vLLM** via custom `apiBase`. Keys/configs are stored per provider.
-- **Persistence**: providers, prompts, and executions are persisted in SQLite (string-serialized payloads for compatibility).
+- **Persistence**: providers, prompts, and executions are persisted in PostgreSQL (string-serialized payloads for compatibility).
 
 ## Stack
 
 - **pnpm workspaces** with apps and shared packages.
 - **apps/web**: Next.js (App Router, TypeScript, Tailwind CSS, react-query, react-chartjs-2, fuse.js).
 - **apps/server**: Express + TypeScript, yahoo-finance2, Prisma client, LRU caches, rate limiting.
-- **packages/db**: Prisma schema + SQLite database (`./data/trader.db`).
+- **packages/db**: Prisma schema + PostgreSQL migrations.
 - **packages/server-shared**: MIC ? Yahoo Finance suffix mapping helpers.
 
 ## Features
 
 - Global autocomplete backed by OpenFIGI with optional API key and Yahoo fallback to cover venues beyond the MIC mapping.
-- Persistent symbol resolution cache (SQLite) for auditability.
+- Persistent symbol resolution cache (PostgreSQL) for auditability.
 - LLM planner pipeline (JSON-schema constrained): Express exposes provider/prompt/execution endpoints; Next.js console orchestrates runs and displays history.
 - Market data endpoints with in-memory TTL caching (5 min quotes / 15 min history) and optional Stooq EOD fallback (`ENABLE_STOOQ_FALLBACK`).
 - Portfolio endpoints to fetch current holdings, PnL, trade history, and to record simulated trades with weighted-average pricing logic.
@@ -47,12 +47,12 @@ Monorepo for a local-first paper trading desk covering global equities, ETFs/ETN
 
 ```bash
 pnpm install        # Installs deps (Prisma client generated automatically)
-# initialise / migrate the SQLite schema
+# Apply migrations to your Postgres database (Neon or local).
 pnpm --filter @paper-trading/db prisma:migrate
 pnpm -w run dev     # Starts API (4000) and web app (5000) concurrently
 ```
 
-> The server `dev`/`start` scripts automatically run `prisma migrate deploy` to keep the SQLite schema in sync before booting.
+> The server `dev`/`start` scripts automatically run `prisma migrate deploy` to keep the PostgreSQL schema in sync before booting.
 
 The API listens on `http://localhost:4000` and the web UI on `http://localhost:5000`.
 
@@ -60,12 +60,14 @@ The API listens on `http://localhost:4000` and the web UI on `http://localhost:5
 
 Copy `.env.example` to `.env` (root) and adjust as needed:
 
+- `DATABASE_URL`: pooled Postgres connection string (e.g. Neon `?pgbouncer=true&connection_limit=1`).
+- `DIRECT_DATABASE_URL`: direct Postgres connection string used for Prisma migrations.
 - `OPENFIGI_API_KEY` (optional): raises OpenFIGI rate limit to 20 req/min.
-- `CLIENT_ORIGIN`: comma-separated origins allowed by the API CORS middleware.
+- `CLIENT_ORIGIN`: comma-separated origins allowed by the API CORS middleware (wildcards for `*.vercel.app` previews are handled automatically).
 - `PORT` (optional): override the API port if you need something other than `4000`.
 - `ENABLE_STOOQ_FALLBACK`: set to `true` to enable the Stooq EOD backup when Yahoo fails.
 
-SQLite data lives in `./data/trader.db`. Prisma creates the database file automatically on first access.
+Provision a Postgres database (Neon is recommended for serverless previews) and ensure both connection strings are available before running migrations locally or in CI.
 
 ### Useful scripts
 

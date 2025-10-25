@@ -1,4 +1,4 @@
-import cors from "cors";
+import cors, { CorsOptions } from "cors";
 import express from "express";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
@@ -65,15 +65,65 @@ const historySchema = z.object({
   interval: z.string().default("1d")
 });
 
+const parseOrigins = (raw?: string) =>
+  (raw ?? "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+const explicitOrigins = parseOrigins(process.env.CLIENT_ORIGIN);
+
+const defaultDevOrigins = [
+  "http://localhost:3000",
+  "http://localhost:5000",
+  "http://127.0.0.1:3000",
+  "http://127.0.0.1:5000"
+];
+
+const vercelUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined;
+
+const combinedOrigins = Array.from(
+  new Set([
+    ...explicitOrigins,
+    ...(vercelUrl ? [vercelUrl] : []),
+    ...(process.env.NODE_ENV !== "production" ? defaultDevOrigins : [])
+  ])
+);
+
+const isVercelPreviewOrigin = (origin: string) => {
+  try {
+    const { hostname } = new URL(origin);
+    return hostname.endsWith(".vercel.app");
+  } catch (error) {
+    console.warn("Invalid origin provided to CORS", origin, error);
+    return false;
+  }
+};
+
+const corsOptions: CorsOptions = {
+  origin: (origin, callback) => {
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    if (combinedOrigins.includes(origin) || isVercelPreviewOrigin(origin)) {
+      return callback(null, true);
+    }
+
+    if (combinedOrigins.length === 0 && process.env.NODE_ENV !== "production") {
+      return callback(null, true);
+    }
+
+    console.warn(`Blocked CORS origin: ${origin}`);
+    return callback(new Error("Not allowed by CORS"));
+  }
+};
+
 export async function createServer() {
   const app = express();
 
   app.use(helmet());
-  app.use(
-    cors({
-      origin: process.env.CLIENT_ORIGIN ? process.env.CLIENT_ORIGIN.split(",") : true
-    })
-  );
+  app.use(cors(corsOptions));
   app.use(express.json());
 
   app.use(
