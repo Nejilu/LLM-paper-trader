@@ -2,6 +2,20 @@ import { LRUCache } from "lru-cache";
 import yahooFinance from "yahoo-finance2";
 import { HistoryCandle, QuoteResponse } from "./types";
 
+interface FetchResponseLike {
+  ok: boolean;
+  text(): Promise<string>;
+}
+
+function isFetchResponseLike(value: unknown): value is FetchResponseLike {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Partial<FetchResponseLike>;
+  return typeof candidate.ok === "boolean" && typeof candidate.text === "function";
+}
+
 const quoteCache = new LRUCache<string, QuoteResponse>({
   max: 200,
   ttl: 1000 * 60 * 5,
@@ -184,6 +198,12 @@ async function fetchStooqHistory(symbol: string): Promise<HistoryCandle[] | null
       return null;
     }
     const response = await fetch(`https://stooq.com/q/d/l/?s=${encodeURIComponent(stooqSymbol)}&i=d`);
+
+    if (!isFetchResponseLike(response)) {
+      console.error("Stooq request failed: unexpected response", response);
+      return null;
+    }
+
     if (!response.ok) {
       return null;
     }
