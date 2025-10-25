@@ -52,7 +52,7 @@ pnpm --filter @paper-trading/db prisma:migrate
 pnpm -w run dev     # Starts API (4000) and web app (5000) concurrently
 ```
 
-> The server `dev`/`start` scripts automatically run `prisma migrate deploy` to keep the PostgreSQL schema in sync before booting.
+> The server `dev`/`start` scripts and the workspace `pnpm run build` now run `prisma migrate deploy` automatically to keep the PostgreSQL schema in sync before booting or typechecking.
 
 The API listens on `http://localhost:4000` and the web UI on `http://localhost:5000`.
 

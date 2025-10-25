@@ -7,7 +7,7 @@
                 },
     "scripts":  {
                     "dev":  "concurrently \"pnpm --filter @paper-trading/server dev\" \"pnpm --filter @paper-trading/web dev\"",
-                    "build":  "pnpm -r run build",
+                    "build":  "pnpm --filter @paper-trading/db prisma:migrate && pnpm -r run build",
                     "lint":  "pnpm -r run lint",
                     "test":  "pnpm -r run test",
                     "postinstall":  "pnpm --filter @paper-trading/db prisma:generate"
