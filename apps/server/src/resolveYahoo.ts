@@ -64,11 +64,12 @@ async function persistResolution(query: string, symbol: string, mic?: string | n
         mic: normalizedMic
       }
     });
-  } catch (error) {
+  } catch (error: unknown) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       return;
     }
-    console.error("Failed to persist symbol resolution", error);
+    const reason = error instanceof Error ? error : new Error(String(error));
+    console.error("Failed to persist symbol resolution", reason);
   }
 }
 
@@ -106,8 +107,9 @@ async function searchYahoo(options: ResolveYahooOptions): Promise<ResolvedSymbol
       yahooSymbol: bestCandidate.symbol,
       source: "yahoo"
     };
-  } catch (error) {
-    console.error("Yahoo Finance search failed", error);
+  } catch (error: unknown) {
+    const reason = error instanceof Error ? error : new Error(String(error));
+    console.error("Yahoo Finance search failed", reason);
     return undefined;
   }
 }
