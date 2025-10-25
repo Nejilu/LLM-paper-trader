@@ -21,6 +21,27 @@ interface OpenFigiResponse {
 
 type AssetClassFilter = AssetClass[] | undefined;
 
+interface FetchResponse {
+  ok: boolean;
+  status: number;
+  text(): Promise<string>;
+  json(): Promise<unknown>;
+}
+
+function isFetchResponse(value: unknown): value is FetchResponse {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Partial<FetchResponse>;
+  return (
+    typeof candidate.ok === "boolean" &&
+    typeof candidate.status === "number" &&
+    typeof candidate.text === "function" &&
+    typeof candidate.json === "function"
+  );
+}
+
 class RateLimiter {
   private readonly timestamps: number[] = [];
 
@@ -153,6 +174,11 @@ export class OpenFigiClient {
           }
         })
       });
+
+      if (!isFetchResponse(response)) {
+        console.error("OpenFIGI request failed: unexpected response", response);
+        return undefined;
+      }
 
       if (!response.ok) {
         const text = await response.text();
