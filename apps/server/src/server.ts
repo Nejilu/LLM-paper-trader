@@ -3,6 +3,7 @@ import express from "express";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import { prisma, Prisma } from "@paper-trading/db";
+import type { Position, Trade } from "@paper-trading/db";
 import yahooFinance from "yahoo-finance2";
 import { z } from "zod";
 import { OpenFigiClient } from "./openfigi";
@@ -359,12 +360,12 @@ export async function createServer() {
           cashBalance: decimalToNumber(portfolio.cashBalance),
           exportedAt: new Date().toISOString()
         },
-        positions: positions.map((position) => ({
+        positions: positions.map((position: Position) => ({
           symbol: position.symbol,
           qty: position.qty.toNumber(),
           avgPrice: position.avgPrice.toNumber()
         })),
-        trades: trades.map((trade) => ({
+        trades: trades.map((trade: Trade) => ({
           symbol: trade.symbol,
           side: trade.side,
           qty: trade.qty.toNumber(),
@@ -399,7 +400,7 @@ export async function createServer() {
 
       await getPortfolioRecord(portfolioId);
 
-      await prisma.$transaction(async (tx) => {
+      await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         const portfolio = await tx.portfolio.findUnique({
           where: { id: portfolioId }
         });
@@ -669,8 +670,11 @@ async function buildPortfolioSnapshot(portfolioId: number = DEFAULT_PORTFOLIO_ID
     where: { portfolioId }
   });
 
-  const quotes = await Promise.all(positions.map((position) => getQuote(position.symbol)));
-  const positionDtos = positions.map((position, index) => computePositionDto(position, quotes[index] ?? { price: null }));
+  const quotes = await Promise.all(positions.map((position: Position) => getQuote(position.symbol)));
+  const emptyQuote: Parameters<typeof computePositionDto>[1] = { price: null };
+  const positionDtos = positions.map((position: Position, index: number) =>
+    computePositionDto(position, quotes[index] ?? emptyQuote)
+  );
   const totals = computePortfolioTotals(positionDtos);
 
   return {

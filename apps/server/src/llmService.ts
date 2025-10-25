@@ -64,7 +64,7 @@ interface ExecutionContext {
 }
 
 interface ChatMessage {
-  role: "system" | "user";
+  role: "system" | "user" | "assistant";
   content: string;
 }
 
@@ -141,7 +141,10 @@ export class LlmPlanExecutionError extends Error {
     result: Omit<LlmRunResult, "executed" | "snapshot"> & { executed: false },
     options?: { cause?: unknown }
   ) {
-    super(message, options);
+    super(message);
+    if (options?.cause !== undefined) {
+      (this as { cause?: unknown }).cause = options.cause;
+    }
     this.name = "LlmPlanExecutionError";
     this.result = result;
   }
