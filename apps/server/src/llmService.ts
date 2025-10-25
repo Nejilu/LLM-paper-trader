@@ -119,6 +119,36 @@ export interface ProviderCallResult {
   groundingMetadata?: GeminiGroundingMetadata;
 }
 
+interface FetchResponseLike {
+  ok: boolean;
+  status: number;
+  text(): Promise<string>;
+  json(): Promise<unknown>;
+}
+
+function isFetchResponseLike(value: unknown): value is FetchResponseLike {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Partial<FetchResponseLike>;
+  return (
+    typeof candidate.ok === "boolean" &&
+    typeof candidate.status === "number" &&
+    typeof candidate.text === "function" &&
+    typeof candidate.json === "function"
+  );
+}
+
+function ensureFetchResponseLike(value: unknown, context: string): FetchResponseLike {
+  if (isFetchResponseLike(value)) {
+    return value;
+  }
+
+  console.error(`${context}: unexpected response`, value);
+  throw new Error(`${context}: unexpected response`);
+}
+
 export interface LlmRunResult {
   plan: ArbitragePlan;
   rawResponse: string;
@@ -424,20 +454,26 @@ async function callOpenAiCompatibleProvider(
     headers.Authorization = `Bearer ${provider.apiKey}`;
   }
 
-  let response = await fetch(requestUrl, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(baseBody)
-  });
+  let response = ensureFetchResponseLike(
+    await fetch(requestUrl, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(baseBody)
+    }),
+    "LLM provider request"
+  );
 
   if (!response.ok && payload.response_format) {
     const fallbackBody = { ...baseBody };
     delete fallbackBody.response_format;
-    response = await fetch(requestUrl, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(fallbackBody)
-    });
+    response = ensureFetchResponseLike(
+      await fetch(requestUrl, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(fallbackBody)
+      }),
+      "LLM provider request"
+    );
   }
 
   if (!response.ok) {
@@ -491,11 +527,14 @@ async function callGeminiProvider(
     headers["x-goog-api-key"] = provider.apiKey;
   }
 
-  const response = await fetch(requestUrl, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(body)
-  });
+  const response = ensureFetchResponseLike(
+    await fetch(requestUrl, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body)
+    }),
+    "Gemini provider request"
+  );
 
   if (!response.ok) {
     const text = await response.text();
@@ -603,11 +642,14 @@ async function callAnthropicProvider(
     headers["x-api-key"] = provider.apiKey;
   }
 
-  const response = await fetch(requestUrl, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(body)
-  });
+  const response = ensureFetchResponseLike(
+    await fetch(requestUrl, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body)
+    }),
+    "Anthropic provider request"
+  );
 
   if (!response.ok) {
     const text = await response.text();
