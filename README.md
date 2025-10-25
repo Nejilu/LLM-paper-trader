@@ -61,13 +61,13 @@ The API listens on `http://localhost:4000` and the web UI on `http://localhost:5
 Copy `.env.example` to `.env` (root) and adjust as needed:
 
 - `DATABASE_URL`: pooled Postgres connection string (e.g. Neon `?pgbouncer=true&connection_limit=1`).
-- `DIRECT_DATABASE_URL`: direct Postgres connection string used for Prisma migrations.
+- `DATABASE_URL_UNPOOLED`: direct Postgres connection string used for Prisma migrations (matches Neon `DATABASE_URL_UNPOOLED`).
 - `OPENFIGI_API_KEY` (optional): raises OpenFIGI rate limit to 20 req/min.
 - `CLIENT_ORIGIN`: comma-separated origins allowed by the API CORS middleware (wildcards for `*.vercel.app` previews are handled automatically).
 - `PORT` (optional): override the API port if you need something other than `4000`.
 - `ENABLE_STOOQ_FALLBACK`: set to `true` to enable the Stooq EOD backup when Yahoo fails.
 
-Provision a Postgres database (Neon is recommended for serverless previews) and ensure both connection strings are available before running migrations locally or in CI.
+Provision a Postgres database (Neon is recommended for serverless previews) and ensure both connection strings (`DATABASE_URL` and `DATABASE_URL_UNPOOLED`) are available before running migrations locally or in CI.
 
 ### Useful scripts
 
