@@ -6,6 +6,7 @@
         "predev": "pnpm --filter @paper-trading/db prisma:migrate",
         "dev": "tsx watch src/index.ts",
         "prestart": "pnpm --filter @paper-trading/db prisma:migrate",
+        "prebuild": "pnpm --filter @paper-trading/db build && pnpm --filter @paper-trading/server-shared build",
         "build": "tsc -p tsconfig.build.json",
         "start": "node dist/index.js",
         "lint": "eslint \"src/**/*.ts\"",

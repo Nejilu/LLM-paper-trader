@@ -1,6 +1,6 @@
 -- CreateTable
 CREATE TABLE IF NOT EXISTS "LlmRunSchedule" (
-    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "id" SERIAL PRIMARY KEY,
     "portfolioId" INTEGER NOT NULL,
     "promptId" INTEGER,
     "providerId" INTEGER,
@@ -9,8 +9,8 @@ CREATE TABLE IF NOT EXISTS "LlmRunSchedule" (
     "dayOfWeek" INTEGER,
     "dayOfMonth" INTEGER,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "LlmRunSchedule_portfolioId_fkey" FOREIGN KEY ("portfolioId") REFERENCES "Portfolio" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT "LlmRunSchedule_promptId_fkey" FOREIGN KEY ("promptId") REFERENCES "PortfolioPrompt" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
     CONSTRAINT "LlmRunSchedule_providerId_fkey" FOREIGN KEY ("providerId") REFERENCES "LlmProvider" ("id") ON DELETE SET NULL ON UPDATE CASCADE

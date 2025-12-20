@@ -2,6 +2,20 @@ import { LRUCache } from "lru-cache";
 import yahooFinance from "yahoo-finance2";
 import { HistoryCandle, QuoteResponse } from "./types";
 
+interface FetchResponseLike {
+  ok: boolean;
+  text(): Promise<string>;
+}
+
+function isFetchResponseLike(value: unknown): value is FetchResponseLike {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Partial<FetchResponseLike>;
+  return typeof candidate.ok === "boolean" && typeof candidate.text === "function";
+}
+
 const quoteCache = new LRUCache<string, QuoteResponse>({
   max: 200,
   ttl: 1000 * 60 * 5,
@@ -22,20 +36,27 @@ export async function getQuote(symbol: string): Promise<QuoteResponse> {
   }
 
   try {
-    const quote = await yahooFinance.quote(normalized, { formatted: false });
+    const quote = await yahooFinance.quote(normalized);
     const payload: QuoteResponse = {
       symbol: quote.symbol ?? normalized,
-      price: typeof quote.regularMarketPrice === "number" ? quote.regularMarketPrice : null,
+      price:
+        typeof quote.regularMarketPrice === "number"
+          ? quote.regularMarketPrice
+          : null,
       currency: quote.currency,
-      changePercent:
-        typeof quote.regularMarketChangePercent === "number" ? quote.regularMarketChangePercent : quote.regularMarketChangePercent?.raw ?? null,
-      change: typeof quote.regularMarketChange === "number" ? quote.regularMarketChange : quote.regularMarketChange?.raw ?? null,
+      changePercent: typeof quote.regularMarketChangePercent === "number" ? quote.regularMarketChangePercent : null,
+      change: typeof quote.regularMarketChange === "number" ? quote.regularMarketChange : null,
       marketState: quote.marketState,
       previousClose:
         typeof quote.regularMarketPreviousClose === "number"
           ? quote.regularMarketPreviousClose
-          : quote.regularMarketPreviousClose?.raw ?? null,
-      timestamp: quote.regularMarketTime ?? null
+          : null,
+      timestamp:
+        typeof quote.regularMarketTime === "number"
+          ? quote.regularMarketTime
+          : quote.regularMarketTime instanceof Date
+            ? quote.regularMarketTime.getTime()
+            : null
     };
 
     quoteCache.set(normalized, payload);
@@ -70,23 +91,65 @@ function normalizeRange(range: string) {
   }
 }
 
+const CHART_INTERVALS = [
+  "1m",
+  "2m",
+  "5m",
+  "15m",
+  "30m",
+  "60m",
+  "90m",
+  "1h",
+  "1d",
+  "5d",
+  "1wk",
+  "1mo",
+  "3mo"
+] as const;
+
+type ChartInterval = (typeof CHART_INTERVALS)[number];
+
+function normalizeInterval(interval: string): ChartInterval {
+  const lower = interval.toLowerCase();
+  if ((CHART_INTERVALS as readonly string[]).includes(lower)) {
+    return lower as ChartInterval;
+  }
+  return "1d";
+}
+
+type ChartQuote = {
+  date?: Date | null;
+  timestamp?: number | null;
+  open?: number | null;
+  high?: number | null;
+  low?: number | null;
+  close?: number | null;
+  volume?: number | null;
+};
+
+type ChartResponseLike = { quotes?: ChartQuote[] };
+
 export async function getHistory(symbol: string, range: string, interval: string): Promise<HistoryCandle[]> {
   const normalizedRange = normalizeRange(range);
-  const key = `${symbol}|${normalizedRange}|${interval}`;
+  const normalizedInterval = normalizeInterval(interval);
+  const key = `${symbol}|${normalizedRange}|${normalizedInterval}`;
   const cached = historyCache.get(key);
   if (cached) {
     return cached;
   }
 
   try {
-    const chart = await yahooFinance.chart(symbol, {
-      range: normalizedRange,
-      interval,
-      return: "object"
-    });
+    const chart = (await yahooFinance.chart(
+      symbol,
+      {
+        range: normalizedRange,
+        interval: normalizedInterval,
+        return: "object"
+      } as unknown as Parameters<typeof yahooFinance.chart>[1]
+    )) as ChartResponseLike;
     const quotes = chart.quotes ?? [];
     const candles: HistoryCandle[] = quotes
-      .map((point) => {
+      .map((point: ChartQuote) => {
         const isoDate =
           point.date instanceof Date
             ? point.date.toISOString()
@@ -135,6 +198,12 @@ async function fetchStooqHistory(symbol: string): Promise<HistoryCandle[] | null
       return null;
     }
     const response = await fetch(`https://stooq.com/q/d/l/?s=${encodeURIComponent(stooqSymbol)}&i=d`);
+
+    if (!isFetchResponseLike(response)) {
+      console.error("Stooq request failed: unexpected response", response);
+      return null;
+    }
+
     if (!response.ok) {
       return null;
     }
@@ -145,7 +214,7 @@ async function fetchStooqHistory(symbol: string): Promise<HistoryCandle[] | null
     }
     const [, ...rows] = lines;
     return rows
-      .map((row) => {
+      .map((row: string) => {
         const [date, open, high, low, close, volume] = row.split(",");
         return {
           date,
@@ -156,7 +225,7 @@ async function fetchStooqHistory(symbol: string): Promise<HistoryCandle[] | null
           volume: parseFloatOrNull(volume)
         } as HistoryCandle;
       })
-      .filter((entry) => entry.date);
+      .filter((entry): entry is HistoryCandle => Boolean(entry.date));
   } catch (error) {
     console.error("Stooq fallback failed", error);
     return null;
