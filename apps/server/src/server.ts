@@ -122,6 +122,7 @@ const corsOptions: CorsOptions = {
 
 export function createServer() {
   const app = express();
+  app.set("trust proxy", 1);
 
   app.use(helmet());
   app.use(cors(corsOptions));
@@ -692,7 +693,6 @@ async function buildPortfolioSnapshot(portfolioId: number = DEFAULT_PORTFOLIO_ID
     positions: sortPositions(positionDtos)
   };
 }
-
 
 
 
