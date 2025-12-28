@@ -120,7 +120,7 @@ const corsOptions: CorsOptions = {
   }
 };
 
-export async function createServer() {
+export function createServer() {
   const app = express();
 
   app.use(helmet());
@@ -479,6 +479,9 @@ export async function createServer() {
   return app;
 }
 
+const app = createServer();
+export default app;
+
 function parseAssetTypes(value?: string | null): AssetClass[] {
   if (!value) {
     return ["equity", "etf", "etn", "index"];
@@ -689,7 +692,6 @@ async function buildPortfolioSnapshot(portfolioId: number = DEFAULT_PORTFOLIO_ID
     positions: sortPositions(positionDtos)
   };
 }
-
 
 
 
