@@ -71,7 +71,7 @@ Provision a Postgres database (Neon is recommended for serverless previews) and 
 
 ### Vercel backend deployments
 
-- Set `DATABASE_URL` in the Vercel backend project environment variables so Prisma can connect during `prisma generate`/`migrate`.
+- Set `DATABASE_URL` and `DATABASE_URL_UNPOOLED` in the Vercel backend project environment variables so Prisma can connect during `prisma generate` (pooled URL) and run `prisma migrate deploy` via the direct/unpooled URL.
 - Expose Vercel system environment variables so `VERCEL_ENV` is available at build time; otherwise the production-only migration guard cannot run.
 - The backend project uses `apps/server/vercel.json` to force `pnpm vercel-build`, which runs `prisma generate` on every deploy and `prisma migrate deploy` only when `VERCEL_ENV=production`.
 
