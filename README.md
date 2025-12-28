@@ -69,6 +69,12 @@ Copy `.env.example` to `.env` (root) and adjust as needed:
 
 Provision a Postgres database (Neon is recommended for serverless previews) and ensure both connection strings (`DATABASE_URL` and `DATABASE_URL_UNPOOLED`) are available before running migrations locally or in CI.
 
+### Vercel backend deployments
+
+- Set `DATABASE_URL` in the Vercel backend project environment variables so Prisma can connect during `prisma generate`/`migrate`.
+- Expose Vercel system environment variables so `VERCEL_ENV` is available at build time; otherwise the production-only migration guard cannot run.
+- The backend project uses `apps/server/vercel.json` to force `pnpm vercel-build`, which runs `prisma generate` on every deploy and `prisma migrate deploy` only when `VERCEL_ENV=production`.
+
 ### Useful scripts
 
 ```bash
@@ -134,7 +140,6 @@ packages/
 ```
 
 Enjoy building strategies in a safe simulated environment!
-
 
 
 

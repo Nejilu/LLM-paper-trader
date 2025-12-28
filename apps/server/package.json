@@ -7,6 +7,7 @@
         "dev": "tsx watch src/index.ts",
         "prestart": "pnpm --filter @paper-trading/db prisma:migrate",
         "prebuild": "pnpm --filter @paper-trading/db build && pnpm --filter @paper-trading/server-shared build",
+        "vercel-build": "pnpm --filter @paper-trading/db exec prisma generate && if [ \"$VERCEL_ENV\" = \"production\" ]; then pnpm --filter @paper-trading/db exec prisma migrate deploy; fi && pnpm --filter @paper-trading/db build && pnpm --filter @paper-trading/server-shared build && pnpm --filter @paper-trading/server build",
         "build": "tsc -p tsconfig.build.json",
         "start": "node dist/index.js",
         "lint": "eslint \"src/**/*.ts\"",
