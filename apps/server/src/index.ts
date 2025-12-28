@@ -9,7 +9,7 @@ const port = Number(process.env.PORT ?? 4000);
 async function bootstrap() {
   try {
     await prisma.$connect();
-    const app = await createServer();
+    const app = createServer();
     app.listen(port, () => {
       console.log(`API server listening on http://localhost:${port}`);
     });

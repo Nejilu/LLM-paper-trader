@@ -1,8 +1,9 @@
-import cors from "cors";
+import cors, { CorsOptions } from "cors";
 import express from "express";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import { prisma, Prisma } from "@paper-trading/db";
+import type { Position, Trade } from "@paper-trading/db";
 import yahooFinance from "yahoo-finance2";
 import { z } from "zod";
 import { OpenFigiClient } from "./openfigi";
@@ -65,15 +66,65 @@ const historySchema = z.object({
   interval: z.string().default("1d")
 });
 
-export async function createServer() {
+const parseOrigins = (raw?: string) =>
+  (raw ?? "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+const explicitOrigins = parseOrigins(process.env.CLIENT_ORIGIN);
+
+const defaultDevOrigins = [
+  "http://localhost:3000",
+  "http://localhost:5000",
+  "http://127.0.0.1:3000",
+  "http://127.0.0.1:5000"
+];
+
+const vercelUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined;
+
+const combinedOrigins = Array.from(
+  new Set([
+    ...explicitOrigins,
+    ...(vercelUrl ? [vercelUrl] : []),
+    ...(process.env.NODE_ENV !== "production" ? defaultDevOrigins : [])
+  ])
+);
+
+const isVercelPreviewOrigin = (origin: string) => {
+  try {
+    const { hostname } = new URL(origin);
+    return hostname.endsWith(".vercel.app");
+  } catch (error) {
+    console.warn("Invalid origin provided to CORS", origin, error);
+    return false;
+  }
+};
+
+const corsOptions: CorsOptions = {
+  origin: (origin, callback) => {
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    if (combinedOrigins.includes(origin) || isVercelPreviewOrigin(origin)) {
+      return callback(null, true);
+    }
+
+    if (combinedOrigins.length === 0 && process.env.NODE_ENV !== "production") {
+      return callback(null, true);
+    }
+
+    console.warn(`Blocked CORS origin: ${origin}`);
+    return callback(new Error("Not allowed by CORS"));
+  }
+};
+
+export function createServer() {
   const app = express();
 
   app.use(helmet());
-  app.use(
-    cors({
-      origin: process.env.CLIENT_ORIGIN ? process.env.CLIENT_ORIGIN.split(",") : true
-    })
-  );
+  app.use(cors(corsOptions));
   app.use(express.json());
 
   app.use(
@@ -309,12 +360,12 @@ export async function createServer() {
           cashBalance: decimalToNumber(portfolio.cashBalance),
           exportedAt: new Date().toISOString()
         },
-        positions: positions.map((position) => ({
+        positions: positions.map((position: Position) => ({
           symbol: position.symbol,
           qty: position.qty.toNumber(),
           avgPrice: position.avgPrice.toNumber()
         })),
-        trades: trades.map((trade) => ({
+        trades: trades.map((trade: Trade) => ({
           symbol: trade.symbol,
           side: trade.side,
           qty: trade.qty.toNumber(),
@@ -349,7 +400,7 @@ export async function createServer() {
 
       await getPortfolioRecord(portfolioId);
 
-      await prisma.$transaction(async (tx) => {
+      await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         const portfolio = await tx.portfolio.findUnique({
           where: { id: portfolioId }
         });
@@ -427,6 +478,9 @@ export async function createServer() {
   registerLlmRoutes(app);
   return app;
 }
+
+const app = createServer();
+export default app;
 
 function parseAssetTypes(value?: string | null): AssetClass[] {
   if (!value) {
@@ -619,8 +673,11 @@ async function buildPortfolioSnapshot(portfolioId: number = DEFAULT_PORTFOLIO_ID
     where: { portfolioId }
   });
 
-  const quotes = await Promise.all(positions.map((position) => getQuote(position.symbol)));
-  const positionDtos = positions.map((position, index) => computePositionDto(position, quotes[index] ?? { price: null }));
+  const quotes = await Promise.all(positions.map((position: Position) => getQuote(position.symbol)));
+  const emptyQuote: Parameters<typeof computePositionDto>[1] = { price: null };
+  const positionDtos = positions.map((position: Position, index: number) =>
+    computePositionDto(position, quotes[index] ?? emptyQuote)
+  );
   const totals = computePortfolioTotals(positionDtos);
 
   return {
@@ -635,7 +692,6 @@ async function buildPortfolioSnapshot(portfolioId: number = DEFAULT_PORTFOLIO_ID
     positions: sortPositions(positionDtos)
   };
 }
-
 
 
 
