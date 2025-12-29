@@ -1,8 +1,7 @@
 type FetchInit = RequestInit & { next?: { revalidate?: number } };
 
 export async function apiFetch<T>(path: string, init?: FetchInit): Promise<T> {
-  const url =
-    path.startsWith("http") ? path : path.startsWith("/") ? path : `/${path}`;
+  const url = path.startsWith("/") ? path : `/${path}`;
   const response = await fetch(url, {
     ...init,
     headers: {
