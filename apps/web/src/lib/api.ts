@@ -1,9 +1,7 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
-
 type FetchInit = RequestInit & { next?: { revalidate?: number } };
 
 export async function apiFetch<T>(path: string, init?: FetchInit): Promise<T> {
-  const url = path.startsWith("http") ? path : `${API_BASE_URL}${path}`;
+  const url = path.startsWith("/") ? path : `/${path}`;
   const response = await fetch(url, {
     ...init,
     headers: {
@@ -29,5 +27,3 @@ async function safeParseError(response: Response) {
     return response.statusText;
   }
 }
-
-export { API_BASE_URL };
