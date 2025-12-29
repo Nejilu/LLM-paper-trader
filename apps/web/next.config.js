@@ -1,9 +1,9 @@
 /** @type {import('next').NextConfig} */
-const apiOrigin = (process.env.API_ORIGIN ?? "http://localhost:3001").replace(/\/$/, "");
+const apiOrigin = (process.env.API_ORIGIN ?? "http://localhost:4000").replace(/\/$/, "");
 
 if (!process.env.API_ORIGIN) {
   // eslint-disable-next-line no-console
-  console.warn("API_ORIGIN is not set. Falling back to http://localhost:3001");
+  console.warn("API_ORIGIN is not set. Falling back to http://localhost:4000");
 }
 
 const nextConfig = {

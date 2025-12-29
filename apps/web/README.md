@@ -14,7 +14,7 @@ Set `API_ORIGIN` in your environment to point at the backend.
 Create `apps/web/.env.local` with:
 
 ```
-API_ORIGIN=http://localhost:3001
+API_ORIGIN=http://localhost:4000
 ```
 
 ### Vercel (Preview/Prod)
